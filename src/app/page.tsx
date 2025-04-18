@@ -5,8 +5,8 @@ export default function Home() {
   return (
     <div className="relative bg-secondary min-h-screen flex items-center justify-center">
       <div className="container mx-auto text-center py-20">
-        <h1 className="text-5xl font-bold text-primary mb-8 animate-pulse">
-          <span className="inline-block mr-2"><Rocket className="inline-block h-10 w-10 text-primary" /></span>
+        <h1 className="text-5xl font-bold text-primary mb-8">
+          <span className="inline-block mr-2"><Rocket className="inline-block h-10 w-10 text-primary animate-spin-slow" /></span>
           ReferralBridge
         </h1>
         <p className="text-gray-100 text-lg mb-10">
