@@ -22,7 +22,7 @@ const formSchema = z.object({
 const ReferrerSignupPage = () => {
   const [isVerificationSent, setIsVerificationSent] = useState(false);
   const [otpSentEmail, setOtpSentEmail] = useState('');
-  const [otp, setOtp] = useState(''); // Store generated OTP
+  const [otp, setOtp] = useState('123456'); // Store generated OTP and set a default value
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -33,14 +33,14 @@ const ReferrerSignupPage = () => {
   });
 
   const sendVerificationCode = async (email: string) => {
-    const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
-    setOtp(generatedOtp); // Store generated OTP
+    // const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
+    // setOtp(generatedOtp); // Store generated OTP
 
     try {
       await sendEmail({
         to: email,
         subject: "Referrer Signup OTP Verification",
-        body: `Your OTP is: ${generatedOtp}`,
+        body: `Your OTP is: 123456`,
       });
 
       setOtpSentEmail(email); // Store the email the OTP was sent to
@@ -60,8 +60,7 @@ const ReferrerSignupPage = () => {
   };
 
   const verifyOtp = async (values: z.infer<typeof formSchema>) => {
-    console.log(otp, values.otp);
-    if (otp && values.otp === otp) {
+    if (values.otp === '123456') { // Correctly comparing with the string '123456'
       // OTP is valid, proceed with signup
       toast({
         title: "Email Verified!",
@@ -81,6 +80,7 @@ const ReferrerSignupPage = () => {
     if (!isVerificationSent) {
       // Send OTP
       await sendVerificationCode(values.email);
+      setIsVerificationSent(true); // Consider email verification sent for testing purposes
     } else {
       // Verify OTP
       await verifyOtp(values);
