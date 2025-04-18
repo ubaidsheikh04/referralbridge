@@ -9,6 +9,7 @@ import { Form, FormControl, FormItem, FormLabel, FormMessage, FormField } from "
 import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
 import { sendEmail } from "@/services/email";
+import { useRouter } from 'next/navigation';
 
 const formSchema = z.object({
   email: z.string().email({
@@ -23,6 +24,7 @@ const ReferrerSignupPage = () => {
   const [isVerificationSent, setIsVerificationSent] = useState(false);
   const [otpSentEmail, setOtpSentEmail] = useState('');
   const [otp, setOtp] = useState('123456'); // Store generated OTP and set a default value
+  const router = useRouter();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -66,6 +68,7 @@ const ReferrerSignupPage = () => {
         title: "Email Verified!",
         description: "You have successfully signed up as a referrer.",
       });
+      router.push('/dashboard'); // Navigate to the dashboard
     } else {
       // OTP is invalid
       toast({
