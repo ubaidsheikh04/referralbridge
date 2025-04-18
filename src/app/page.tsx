@@ -10,12 +10,12 @@ export default function Home() {
           ReferralBridge
         </h1>
         <p className="text-gray-100 text-lg mb-10">
-          Connecting talent with opportunities through seamless referrals.
+          Welcome to ReferralBridge, your platform for seamless referrals.
         </p>
         <div className="flex flex-col sm:flex-row justify-center space-y-4 sm:space-y-0 sm:space-x-4">
           <Link
             href="/request-referral"
-            className="bg-primary text-primary-foreground hover:bg-primary/80 px-6 py-3 rounded-full font-medium transition-colors duration-300 shadow-md"
+            className="bg-accent text-accent-foreground hover:bg-accent/80 px-6 py-3 rounded-full font-medium transition-colors duration-300 shadow-md"
           >
             Request a Referral
           </Link>
