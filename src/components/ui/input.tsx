@@ -1,9 +1,11 @@
+"use client"
+
 import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
 const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
-  ({ className, type, value, ...props }, ref) => {
+  ({ className, type, value, onChange, ...props }, ref) => {
     return (
       <input
         type={type}
@@ -13,6 +15,7 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
         )}
         ref={ref}
         value={value || ""} // Ensure value is always defined
+        onChange={onChange} // Forward the onChange handler
         {...props}
       />
     )
