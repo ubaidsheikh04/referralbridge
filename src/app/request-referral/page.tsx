@@ -33,7 +33,7 @@ const formSchema = z.object({
 
 const RequestReferralPage = () => {
   const [isOtpSent, setIsOtpSent] = useState(false);
-  const [otp, setOtp] = useState("");
+  const [otp, setOtp] = useState("123456"); // Set a default OTP for testing
   const [email, setEmail] = useState("");
   const [resumeUrl, setResumeUrl] = useState<string | null>(null);
 
@@ -90,31 +90,37 @@ const RequestReferralPage = () => {
     } else {
       // Send OTP
       const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
-      setOtp(generatedOtp);
+      //setOtp(generatedOtp);
       setEmail(values.email);
 
       // Send OTP via email
-      try {
-        await sendEmail({
-          to: values.email,
-          subject: "OTP Verification",
-          body: `Your OTP is: ${generatedOtp}`,
-        });
+      // try {
+      //   await sendEmail({
+      //   to: values.email,
+      //   subject: "OTP Verification",
+      //   body: `Your OTP is: ${generatedOtp}`,
+      //   });
 
-        setIsOtpSent(true);
-        form.setValue("email", values.email); // Persist the email value
-        toast({
-          title: "OTP Sent!",
-          description: "Please check your email to verify your email address.",
-        });
-      } catch (error) {
-        console.error("Error sending OTP:", error);
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "Failed to send OTP. Please try again.",
-        });
-      }
+      //   setIsOtpSent(true);
+      //   form.setValue("email", values.email); // Persist the email value
+      //   toast({
+      //   title: "OTP Sent!",
+      //   description: "Please check your email to verify your email address.",
+      //   });
+      // } catch (error) {
+      //   console.error("Error sending OTP:", error);
+      //   toast({
+      //   variant: "destructive",
+      //   title: "Error",
+      //   description: "Failed to send OTP. Please try again.",
+      //   });
+      // }
+       setIsOtpSent(true);
+            form.setValue("email", values.email); // Persist the email value
+            toast({
+              title: "OTP Sent!",
+              description: "Please use 123456 as OTP",
+            });
     }
   };
 
