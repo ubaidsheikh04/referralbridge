@@ -60,7 +60,8 @@ const ReferrerSignupPage = () => {
   };
 
   const verifyOtp = async (values: z.infer<typeof formSchema>) => {
-    if (values.otp === otp) {
+    console.log(otp, values.otp);
+    if (otp && values.otp === otp) {
       // OTP is valid, proceed with signup
       toast({
         title: "Email Verified!",
