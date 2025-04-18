@@ -12,8 +12,8 @@ import { toast } from "@/hooks/use-toast";
 const formSchema = z.object({
   email: z.string().email({
     message: "Invalid email address. Please use your company email.",
-  }).refine(email => email.endsWith('@accenture.com') || email.endsWith('@tcs.com'), {
-    message: "Please use your company email (@accenture.com or @tcs.com).",
+  }).refine(email => !email.endsWith('@gmail.com'), {
+    message: "Please use your company email (e.g., @accenture.com, @tcs.com).",
   }),
 });
 
@@ -65,3 +65,4 @@ const ReferrerSignupPage = () => {
 };
 
 export default ReferrerSignupPage;
+
