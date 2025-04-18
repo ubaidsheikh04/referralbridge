@@ -18,12 +18,14 @@ const formSchema = z.object({
     message: "Please use your company email (e.g., @accenture.com, @tcs.com).",
   }),
   otp: z.string().optional(),
+  company: z.string().min(2, {
+    message: "Company name must be at least 2 characters.",
+  }),
 });
 
 const ReferrerSignupPage = () => {
   const [isVerificationSent, setIsVerificationSent] = useState(false);
   const [otpSentEmail, setOtpSentEmail] = useState('');
-  const [otp, setOtp] = useState('123456'); // Store generated OTP and set a default value
   const router = useRouter();
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -31,6 +33,7 @@ const ReferrerSignupPage = () => {
     defaultValues: {
       email: "",
       otp: "",
+      company: "",
     },
   });
 
@@ -49,7 +52,7 @@ const ReferrerSignupPage = () => {
       setIsVerificationSent(true);
       toast({
         title: "Verification Email Sent!",
-        description: "Please check your company email to verify your account.",
+        description: "Please use 123456 as OTP",
       });
     } catch (error) {
       console.error("Error sending OTP:", error);
@@ -68,6 +71,7 @@ const ReferrerSignupPage = () => {
         title: "Email Verified!",
         description: "You have successfully signed up as a referrer.",
       });
+      sessionStorage.setItem('company', values.company);
       router.push('/dashboard'); // Navigate to the dashboard
     } else {
       // OTP is invalid
@@ -83,7 +87,7 @@ const ReferrerSignupPage = () => {
     if (!isVerificationSent) {
       // Send OTP
       await sendVerificationCode(values.email);
-      setIsVerificationSent(true); // Consider email verification sent for testing purposes
+      setIsVerificationSent(true);
     } else {
       // Verify OTP
       await verifyOtp(values);
@@ -112,6 +116,23 @@ const ReferrerSignupPage = () => {
               </FormItem>
             )}
           />
+             <FormField
+              control={form.control}
+              name="company"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Company Name</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="Enter your company name"
+                      {...field}
+                      disabled={isVerificationSent}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
           {isVerificationSent && otpSentEmail && (
             <FormField
               control={form.control}
