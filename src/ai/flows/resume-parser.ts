@@ -4,7 +4,7 @@
  *
  * - parseResume - A function that takes a resume URL and returns the extracted information.
  * - ParseResumeInput - The input type for the parseResume function, which is the resume URL.
- * - ParseResumeOutput - The return type for the parseResume function, which includes name, email, target company, job role, and LinkedIn URL.
+ * - ParseResumeOutput - The return type for the parseResume function, which includes name, email, target company, job role.
  */
 
 import {ai} from '@/ai/ai-instance';
@@ -20,7 +20,6 @@ const ParseResumeOutputSchema = z.object({
   email: z.string().email().describe('The email address of the person.'),
   targetCompany: z.string().describe('The target company for the referral.'),
   jobRole: z.string().describe('The job role the person is applying for.'),
-  linkedinUrl: z.string().url().optional().describe('The LinkedIn URL of the person, if available.'),
 });
 export type ParseResumeOutput = z.infer<typeof ParseResumeOutputSchema>;
 
@@ -41,7 +40,6 @@ const resumeParserPrompt = ai.definePrompt({
       email: z.string().email().describe('The email address of the person.'),
       targetCompany: z.string().describe('The target company for the referral.'),
       jobRole: z.string().describe('The job role the person is applying for.'),
-      linkedinUrl: z.string().url().optional().describe('The LinkedIn URL of the person, if available.'),
     }),
   },
   prompt: `You are an expert resume parser. Extract the following information from the resume:
@@ -50,11 +48,10 @@ const resumeParserPrompt = ai.definePrompt({
 - Email
 - Target Company
 - Job Role
-- LinkedIn URL (if available)
 
 Resume: {{media url=resumeUrl}}
 
-Make sure the email field is a valid email. If a linkedin URL is not present, leave it blank.
+Make sure the email field is a valid email.
 `,
 });
 

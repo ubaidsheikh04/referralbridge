@@ -9,6 +9,8 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
+import { uploadFile } from "@/services/file-upload";
+import { sendEmail } from "@/services/email";
 
 const formSchema = z.object({
   name: z.string().min(2, {
@@ -23,16 +25,17 @@ const formSchema = z.object({
   jobId: z.string().min(2, {
     message: "Job ID must be at least 2 characters.",
   }),
-  linkedinUrl: z.string().url({
-    message: "Invalid LinkedIn URL.",
-  }).optional(),
   resume: z.any().refine((files) => files?.length > 0, {
     message: "Resume is required.",
   }),
+  otp: z.string().optional(),
 });
 
 const RequestReferralPage = () => {
   const [isOtpSent, setIsOtpSent] = useState(false);
+  const [otp, setOtp] = useState("");
+  const [email, setEmail] = useState("");
+  const [resumeUrl, setResumeUrl] = useState<string | null>(null);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -41,26 +44,78 @@ const RequestReferralPage = () => {
       email: "",
       targetCompany: "",
       jobId: "",
-      linkedinUrl: "",
+      resume: null,
+      otp: "",
     },
   });
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
-    console.log(values);
-    // Implement OTP verification logic here
-    setIsOtpSent(true);
-    toast({
-      title: "OTP Sent!",
-      description: "Please check your email to verify your email address.",
-    });
-  };
+    if (isOtpSent) {
+      // Verify OTP
+      if (values.otp === otp) {
+        // OTP is valid, proceed to submit the referral request
+        try {
+          // Upload the resume and get the URL
+          const resumeFile = values.resume[0];
+          const uploadedResumeUrl = await uploadFile(resumeFile);
+          setResumeUrl(uploadedResumeUrl);
 
-  const onVerifyOtp = async () => {
-    // Implement OTP verification logic here
-    toast({
-      title: "Email Verified!",
-      description: "You can now submit your referral request.",
-    });
+          // Send email
+          await sendEmail({
+            to: values.email,
+            subject: "Referral Request",
+            body: `Thank you for your referral request. Your resume has been uploaded to ${uploadedResumeUrl}`,
+          });
+
+          toast({
+            title: "Referral Request Submitted!",
+            description: "We have received your referral request and will process it soon.",
+          });
+        } catch (error) {
+          console.error("Error submitting referral request:", error);
+          toast({
+            variant: "destructive",
+            title: "Error",
+            description: "Failed to submit referral request. Please try again.",
+          });
+        }
+      } else {
+        // OTP is invalid
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Invalid OTP. Please try again.",
+        });
+      }
+    } else {
+      // Send OTP
+      const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
+      setOtp(generatedOtp);
+      setEmail(values.email);
+
+      // Send OTP via email
+      try {
+        await sendEmail({
+          to: values.email,
+          subject: "OTP Verification",
+          body: `Your OTP is: ${generatedOtp}`,
+        });
+
+        setIsOtpSent(true);
+        form.setValue("email", values.email); // Persist the email value
+        toast({
+          title: "OTP Sent!",
+          description: "Please check your email to verify your email address.",
+        });
+      } catch (error) {
+        console.error("Error sending OTP:", error);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to send OTP. Please try again.",
+        });
+      }
+    }
   };
 
   return (
@@ -88,19 +143,28 @@ const RequestReferralPage = () => {
               <FormItem>
                 <FormLabel>Email</FormLabel>
                 <FormControl>
-                  <Input placeholder="Enter your email" {...field} disabled={isOtpSent} />
+                  <Input placeholder="Enter your email" {...field} disabled={isOtpSent} value={field.value} onChange={field.onChange} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
             )}
           />
-          {isOtpSent ? (
-            <div className="flex items-center space-x-2">
-              <Input placeholder="Enter OTP" />
-              <Button onClick={onVerifyOtp}>Verify OTP</Button>
-            </div>
-          ) : (
+          {!isOtpSent ? (
             <Button type="submit">Send OTP</Button>
+          ) : (
+            <FormField
+              control={form.control}
+              name="otp"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>OTP</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Enter OTP" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
           )}
           <FormField
             control={form.control}
@@ -131,25 +195,12 @@ const RequestReferralPage = () => {
           />
           <FormField
             control={form.control}
-            name="linkedinUrl"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>LinkedIn URL</FormLabel>
-                <FormControl>
-                  <Input placeholder="Enter LinkedIn URL" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
             name="resume"
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Resume</FormLabel>
                 <FormControl>
-                  <Input type="file" {...field} />
+                  <Input type="file" onChange={(e) => field.onChange(e.target.files)} />
                 </FormControl>
                 <FormMessage />
                 <FormDescription>Upload your resume in PDF or DOCX format.</FormDescription>
@@ -161,6 +212,14 @@ const RequestReferralPage = () => {
           </Button>
         </form>
       </Form>
+      {resumeUrl && (
+        <div className="mt-4">
+          <p>Uploaded Resume:</p>
+          <a href={resumeUrl} target="_blank" rel="noopener noreferrer">
+            View Resume
+          </a>
+        </div>
+      )}
     </div>
   );
 };
