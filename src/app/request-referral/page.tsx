@@ -20,8 +20,8 @@ const formSchema = z.object({
   targetCompany: z.string().min(2, {
     message: "Target company must be at least 2 characters.",
   }),
-  jobRole: z.string().min(2, {
-    message: "Job role must be at least 2 characters.",
+  jobId: z.string().min(2, {
+    message: "Job ID must be at least 2 characters.",
   }),
   linkedinUrl: z.string().url({
     message: "Invalid LinkedIn URL.",
@@ -40,7 +40,7 @@ const RequestReferralPage = () => {
       name: "",
       email: "",
       targetCompany: "",
-      jobRole: "",
+      jobId: "",
       linkedinUrl: "",
     },
   });
@@ -117,14 +117,15 @@ const RequestReferralPage = () => {
           />
           <FormField
             control={form.control}
-            name="jobRole"
+            name="jobId"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Job Role</FormLabel>
+                <FormLabel>Job ID/Referral ID</FormLabel>
                 <FormControl>
-                  <Input placeholder="Enter job role" {...field} />
+                  <Input placeholder="Enter Job ID or Referral ID" {...field} />
                 </FormControl>
                 <FormMessage />
+                <FormDescription>Please check details in job openings.</FormDescription>
               </FormItem>
             )}
           />
