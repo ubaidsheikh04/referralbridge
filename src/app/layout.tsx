@@ -1,7 +1,9 @@
-import type {Metadata} from 'next';
-import {Geist, Geist_Mono} from 'next/font/google';
+import type { Metadata } from 'next';
+import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
+import Link from 'next/link';
+import { Rocket } from 'lucide-react';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -26,10 +28,23 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+        <header className="bg-secondary py-4 px-6 flex items-center justify-between">
+          <Link href="/" className="text-2xl font-bold text-primary flex items-center">
+            <Rocket className="inline-block h-6 w-6 mr-2" />
+            ReferralBridge
+          </Link>
+          <nav>
+            <Link href="/request-referral" className="px-4 py-2 text-foreground hover:text-primary">
+              Request Referral
+            </Link>
+            <Link href="/referrer-signup" className="px-4 py-2 text-foreground hover:text-primary">
+              Referrer Signup
+            </Link>
+          </nav>
+        </header>
         {children}
-        <Toaster/>
+        <Toaster />
       </body>
     </html>
   );
 }
-
