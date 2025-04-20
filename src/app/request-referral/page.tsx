@@ -13,6 +13,7 @@ import { uploadFile } from "@/services/file-upload";
 import { sendEmail } from "@/services/email";
 import { addDoc, collection, getFirestore } from "firebase/firestore";
 import { firebaseApp } from "@/services/firebase";
+import Link from "next/link";
 
 const formSchema = z.object({
   name: z.string().min(2, {
@@ -204,6 +205,11 @@ const RequestReferralPage = () => {
           </Button>
         </form>
       </Form>
+        <Link href="/">
+        <Button variant="secondary">
+            Go Home
+        </Button>
+        </Link>
       {resumeUrl && (
         <div className="mt-4">
           <p>Uploaded Resume:</p>
