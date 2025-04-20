@@ -2,9 +2,10 @@
 
 import { SidebarProvider, Sidebar, SidebarContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarGroup, SidebarGroupLabel } from "@/components/ui/sidebar";
 import { useEffect, useState } from 'react';
-// Import necessary Firebase modules
-import { getFirestore, collection, getDocs, query, where } from 'firebase/firestore';
-import { firebaseApp } from '@/services/firebase';
+// Import Firebase functions
+import { collection, getDocs, query, where } from "firebase/firestore";
+import ReferralRequestTile from "@/components/ReferralRequestTile";
+import { db } from "@/services/firebase";
 
 const DashboardPage = () => {
   const [referralRequests, setReferralRequests] = useState([]);
@@ -20,7 +21,6 @@ const DashboardPage = () => {
   useEffect(() => {
     if (company) {
       const fetchReferralRequests = async () => {
-        const db = getFirestore(firebaseApp);
         const referralCollection = collection(db, 'referralRequests');
 
         // Create a query to filter by company
@@ -60,18 +60,13 @@ const DashboardPage = () => {
         <div className="flex-1 p-4">
           <h1 className="text-2xl font-bold mb-4">Referrer Dashboard</h1>
           {company && <h2 className="text-xl mb-2">Company: {company}</h2>}
-          {referralRequests.length > 0 ? (
-            <ul>
-              {referralRequests.map(request => (
-                <li key={request.id}>
-                  <p>Name: {request.name}</p>
-                  <p>Email: {request.email}</p>
-                  <p>Company: {request.targetCompany}</p>
-                  <p>Job ID: {request.jobId}</p>
-                </li>
+          {referralRequests.length > 0 ? ( // Use a grid layout for the tiles
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {referralRequests.map((request) => (
+                <ReferralRequestTile key={request.id} request={request} />
               ))}
-            </ul>
-          ) : (
+            </div>
+          ) : ( // Retain the message for when no requests are available
             <p>No referral requests available for {company}.</p>
           )}
         </div>

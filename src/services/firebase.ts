@@ -6,22 +6,19 @@ import { addDoc, collection } from "firebase/firestore";
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_AUTH_DOMAIN",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_STORAGE_BUCKET",
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-  appId: "YOUR_APP_ID",
-  measurementId: "YOUR_MEASUREMENT_ID"
+  apiKey: "AIzaSyApkDxOF0E18kTrnKr1oJr_HGGVP3uybWg",
+  authDomain: "referralconnect-sbghj.firebaseapp.com",
+  projectId: "referralconnect-sbghj",
+  storageBucket: "referralconnect-sbghj.firebasestorage.app",
+  messagingSenderId: "117764849626",
+  appId: "1:117764849626:web:e33aec063afdbdfbd98ae3"
 };
 
 // Initialize Firebase
-export const firebaseApp = initializeApp(firebaseConfig);
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
 
-let db: any;
-export const initFirestore = () => {
-  db = getFirestore(firebaseApp);
-};
+
 
 // Function to create a document in a collection
 export const createDocument = async (collectionName: string, documentId: string, data: any) => {
@@ -38,7 +35,7 @@ export const createDocument = async (collectionName: string, documentId: string,
 // Function to get a document from a collection
 export const getDocument = async (collectionName: string, documentId: string) => {
   try {
-    await initFirestore();
+
     const docRef = doc(db, collectionName, documentId)
     const docSnap = await getDoc(docRef);
     return docSnap.exists() ? docSnap.data() : null;
@@ -48,4 +45,4 @@ export const getDocument = async (collectionName: string, documentId: string) =>
   }
 };
 
-export { collection, getFirestore, firebaseApp };
+export { collection, db };

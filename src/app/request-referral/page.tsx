@@ -10,10 +10,10 @@ import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
 import { uploadFile } from "@/services/file-upload";
 import { sendEmail } from "@/services/email";
-import { firebaseApp, getFirestore } from "@/services/firebase";
+import { db, collection } from "@/services/firebase";
 import { useRouter } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
-import { addDoc, collection } from "firebase/firestore";
+import { addDoc } from "firebase/firestore";
 import { useEffect } from 'react';
 
 const formSchema = z.object({
@@ -69,7 +69,6 @@ const RequestReferralPage = () => {
           setResumeUrl(uploadedResumeUrl);
 
           // Add the referral request to Firestore
-          const db = getFirestore(firebaseApp);
           const referralCollection = collection(db, 'referralRequests');
           await addDoc(referralCollection, {
             name: values.name,

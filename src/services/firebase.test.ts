@@ -1,4 +1,4 @@
-import { initFirestore, createDocument, getDocument } from './firebase';
+import { initFirestore, createDocumentWithId, getDocument } from './firebase';
 
 describe('Firebase Database Operations', () => {
     const testCollectionName = 'testCollection';
@@ -13,7 +13,7 @@ describe('Firebase Database Operations', () => {
     });
 
     it('should create a document in the database', async () => {
-        await createDocument(testCollectionName, mockDocId, mockData);
+        await createDocumentWithId(testCollectionName, mockDocId, mockData);
 
         // Verify the document exists (optional, for immediate verification)
         const docSnap = await getDocument(testCollectionName, mockDocId);
@@ -22,7 +22,7 @@ describe('Firebase Database Operations', () => {
 
     it('should get a document from the database', async () => {
         // First, ensure the document exists by creating it.
-        await createDocument(testCollectionName, mockDocId, mockData);
+        await createDocumentWithId(testCollectionName, mockDocId, mockData);
 
         const docSnap = await getDocument(testCollectionName, mockDocId);
         expect(docSnap.exists()).toBe(true);
