@@ -12,7 +12,6 @@ import { uploadFile } from "@/services/file-upload";
 import { sendEmail } from "@/services/email";
 import { firebaseApp, getFirestore } from "@/services/firebase";
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { addDoc, collection } from "firebase/firestore";
 import { useEffect } from 'react';
