@@ -114,11 +114,7 @@ const RequestReferralPage = () => {
 
   return (
     <div className="container mx-auto py-10">
-            <Link href="/" className="absolute top-4 left-4">
-                <Button variant="ghost" size="icon">
-                    <Home className="h-5 w-5" />
-                </Button>
-            </Link>
+            
       <h1 className="text-2xl font-bold mb-4">Referral Request Form</h1>
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
