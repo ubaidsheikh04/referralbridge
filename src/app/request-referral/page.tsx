@@ -92,7 +92,7 @@ const RequestReferralPage = () => {
             description: "We have received your referral request and will process it soon.",
           });
 
-          router.push('/thank-you');
+           router.push('/thank-you');
         } catch (error) {
           console.error("Error submitting referral request:", error);
           toast({
@@ -123,9 +123,7 @@ const RequestReferralPage = () => {
   return (
     <div className="container mx-auto py-10">
        <header className="flex items-center mb-4">
-        <Link href="/" className="flex items-center">
-          <ArrowLeft className="mr-2" />
-        </Link>
+       
       </header>
       <h1 className="text-2xl font-bold mb-4">Referral Request Form</h1>
       <Form {...form}>
