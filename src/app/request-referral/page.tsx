@@ -36,7 +36,6 @@ const formSchema = z.object({
 const RequestReferralPage = () => {
   const [isOtpSent, setIsOtpSent] = useState(false);
   const [otp, setOtp] = useState("123456"); // Set a default OTP for testing
-  const [email, setEmail] = useState("");
   const [resumeUrl, setResumeUrl] = useState<string | null>(null);
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -102,12 +101,12 @@ const RequestReferralPage = () => {
       }
     } else {
       // Send OTP
-       setIsOtpSent(true);
-            form.setValue("email", values.email); // Persist the email value
-            toast({
-              title: "OTP Sent!",
-              description: "Please use 123456 as OTP",
-            });
+      setIsOtpSent(true);
+      form.setValue("email", values.email); // Persist the email value
+      toast({
+        title: "OTP Sent!",
+        description: "Please use 123456 as OTP",
+      });
     }
   };
 
@@ -136,7 +135,7 @@ const RequestReferralPage = () => {
               <FormItem>
                 <FormLabel>Email</FormLabel>
                 <FormControl>
-                  <Input placeholder="Enter your email" {...field} disabled={isOtpSent}  onChange={field.onChange} value={field.value}/>
+                  <Input placeholder="Enter your email" {...field} disabled={isOtpSent} onChange={field.onChange} value={field.value} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
