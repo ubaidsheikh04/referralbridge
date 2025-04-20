@@ -114,6 +114,104 @@ const RequestReferralPage = () => {
 
   return (
     <div className="container mx-auto py-10">
+      <Link href="/" className="absolute top-4 left-4 text-2xl font-bold text-primary flex items-center">
+        <Home className="inline-block h-6 w-6 mr-2" />
+      </Link>
+      <h1 className="text-2xl font-bold mb-4">Referral Request Form</h1>
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <FormField
+            control={form.control}
+            name="name"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Name</FormLabel>
+                <FormControl>
+                  <Input placeholder="Enter your name" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="email"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Email</FormLabel>
+                <FormControl>
+                  <Input placeholder="Enter your email" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="targetCompany"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Target Company</FormLabel>
+                <FormControl>
+                  <Input placeholder="Enter target company" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="jobId"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Job ID/ Referral ID</FormLabel>
+                <FormControl>
+                  <Input placeholder="Enter Job ID/Referral ID and advice checking details in job openings" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="resume"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Resume</FormLabel>
+                <FormControl>
+                  <Input
+                    type="file"
+                    accept=".pdf,.docx"
+                    onChange={(e) => field.onChange(e.target.files)}
+                  />
+                </FormControl>
+                <FormDescription>
+                  Upload your resume in PDF or DOCX format
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          {isOtpSent && (
+            <FormField
+              control={form.control}
+              name="otp"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>OTP</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Enter OTP sent to your email" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          )}
+          <Button type="submit" disabled={isOtpSent && !form.getValues("otp")}>
+            {isOtpSent ? "Submit Referral Request" : "Verify Email"}
+          </Button>
+        </form>
+      </Form>
     </div>
   );
 };
