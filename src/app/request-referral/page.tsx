@@ -10,11 +10,12 @@ import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
 import { uploadFile } from "@/services/file-upload";
 import { sendEmail } from "@/services/email";
-import {  getFirestore, firebaseApp } from "@/services/firebase";
+import { getFirestore, firebaseApp } from "@/services/firebase";
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { addDoc, collection } from "firebase/firestore";
+import { useEffect } from 'react';
 
 const formSchema = z.object({
   name: z.string().min(2, {
@@ -52,6 +53,10 @@ const RequestReferralPage = () => {
     },
   });
   const router = useRouter();
+
+  useEffect(() => {
+    console.log('router useEffect', router)
+  }, [router]);
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     if (isOtpSent) {
