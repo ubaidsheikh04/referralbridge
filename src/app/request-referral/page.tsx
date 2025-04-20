@@ -75,13 +75,6 @@ const RequestReferralPage = () => {
             jobId: values.jobId,
             resumeUrl: uploadedResumeUrl,
           });
-          /* await createDocument('referralRequests',values.email, {
-             name: values.name,
-             email: values.email,
-             targetCompany: values.targetCompany,
-             jobId: values.jobId,
-             resumeUrl: uploadedResumeUrl,
-           });*/
 
           // Send email
           await sendEmail({
@@ -140,7 +133,7 @@ const RequestReferralPage = () => {
               <FormItem>
                 <FormLabel>Name</FormLabel>
                 <FormControl>
-                  <Input placeholder="Enter your name" {...field} />
+                  <Input placeholder="Enter your name" {...field} onChange={field.onChange} value={field.value}/>
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -153,7 +146,7 @@ const RequestReferralPage = () => {
               <FormItem>
                 <FormLabel>Email</FormLabel>
                 <FormControl>
-                  <Input placeholder="Enter your email" {...field} />
+                  <Input placeholder="Enter your email" {...field} onChange={field.onChange} value={field.value}/>
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -166,7 +159,7 @@ const RequestReferralPage = () => {
               <FormItem>
                 <FormLabel>Target Company</FormLabel>
                 <FormControl>
-                  <Input placeholder="Enter target company" {...field} />
+                  <Input placeholder="Enter target company" {...field}  onChange={field.onChange} value={field.value}/>
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -179,7 +172,7 @@ const RequestReferralPage = () => {
               <FormItem>
                 <FormLabel>Job ID/ Referral ID</FormLabel>
                 <FormControl>
-                  <Input placeholder="Enter Job ID/Referral ID and advice checking details in job openings" {...field} />
+                  <Input placeholder="Enter Job ID/Referral ID and advice checking details in job openings" {...field}  onChange={field.onChange} value={field.value}/>
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -213,7 +206,7 @@ const RequestReferralPage = () => {
                 <FormItem>
                   <FormLabel>OTP</FormLabel>
                   <FormControl>
-                    <Input placeholder="Enter OTP sent to your email" {...field} />
+                    <Input placeholder="Enter OTP sent to your email" {...field}  onChange={field.onChange} value={field.value}/>
                   </FormControl>
                   <FormMessage />
                 </FormItem>
