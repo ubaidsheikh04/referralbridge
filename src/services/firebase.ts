@@ -48,4 +48,4 @@ export const getDocument = async (collectionName: string, documentId: string) =>
   }
 };
 
-export { collection, getFirestore };
+export { collection, getFirestore, firebaseApp };

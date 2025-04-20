@@ -7,15 +7,14 @@ import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
 import { uploadFile } from "@/services/file-upload";
 import { sendEmail } from "@/services/email";
-import { initFirestore, collection, getFirestore } from "@/services/firebase";
+import { initFirestore, getFirestore, firebaseApp } from "@/services/firebase";
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
-import { addDoc } from "firebase/firestore";
+import { addDoc, collection } from "firebase/firestore";
 
 const formSchema = z.object({
   name: z.string().min(2, {
@@ -133,7 +132,7 @@ const RequestReferralPage = () => {
               <FormItem>
                 <FormLabel>Name</FormLabel>
                 <FormControl>
-                  <Input placeholder="Enter your name" {...field} onChange={field.onChange} value={field.value}/>
+                  <Input placeholder="Enter your name" {...field}  onChange={field.onChange} value={field.value}/>
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -146,7 +145,7 @@ const RequestReferralPage = () => {
               <FormItem>
                 <FormLabel>Email</FormLabel>
                 <FormControl>
-                  <Input placeholder="Enter your email" {...field} onChange={field.onChange} value={field.value}/>
+                  <Input placeholder="Enter your email" {...field}  onChange={field.onChange} value={field.value}/>
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -159,7 +158,7 @@ const RequestReferralPage = () => {
               <FormItem>
                 <FormLabel>Target Company</FormLabel>
                 <FormControl>
-                  <Input placeholder="Enter target company" {...field}  onChange={field.onChange} value={field.value}/>
+                  <Input placeholder="Enter target company" {...field}   onChange={field.onChange} value={field.value}/>
                 </FormControl>
                 <FormMessage />
               </FormItem>
