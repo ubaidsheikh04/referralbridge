@@ -33,14 +33,6 @@ export default function RootLayout({
             <Rocket className="inline-block h-6 w-6 mr-2" />
             ReferralBridge
           </Link>
-          <nav>
-            <Link href="/request-referral" className="px-4 py-2 text-foreground hover:text-primary">
-              Request Referral
-            </Link>
-            <Link href="/referrer-signup" className="px-4 py-2 text-foreground hover:text-primary">
-              Referrer Signup
-            </Link>
-          </nav>
         </header>
         {children}
         <Toaster />
@@ -48,3 +40,4 @@ export default function RootLayout({
     </html>
   );
 }
+
