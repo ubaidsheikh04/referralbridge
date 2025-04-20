@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
 import { uploadFile } from "@/services/file-upload";
 import { sendEmail } from "@/services/email";
-import { firebaseApp, initFirestore, collection, getFirestore } from "@/services/firebase";
+import { initFirestore, collection, getFirestore } from "@/services/firebase";
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
@@ -88,7 +88,7 @@ const RequestReferralPage = () => {
             description: "We have received your referral request and will process it soon.",
           });
 
-          router.push('/');
+          router.push('/thank-you');
         } catch (error) {
           console.error("Error submitting referral request:", error);
           toast({
