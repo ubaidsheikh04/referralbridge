@@ -11,9 +11,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
 import { uploadFile } from "@/services/file-upload";
 import { sendEmail } from "@/services/email";
-import { firebaseApp, initFirestore } from "@/services/firebase";
+import { firebaseApp, initFirestore, collection, getFirestore } from "@/services/firebase";
 import { useRouter } from 'next/navigation';
-import { addDoc, collection, getFirestore } from "firebase/firestore";
+import Link from 'next/link';
+import { ArrowLeft } from 'lucide-react';
+import { addDoc } from "firebase/firestore";
 
 const formSchema = z.object({
   name: z.string().min(2, {
@@ -123,6 +125,11 @@ const RequestReferralPage = () => {
 
   return (
     <div className="container mx-auto py-10">
+       <header className="flex items-center mb-4">
+        <Link href="/" className="flex items-center">
+          <ArrowLeft className="mr-2" />
+        </Link>
+      </header>
       <h1 className="text-2xl font-bold mb-4">Referral Request Form</h1>
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
