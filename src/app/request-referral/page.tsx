@@ -11,8 +11,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
 import { uploadFile } from "@/services/file-upload";
 import { sendEmail } from "@/services/email";
-import { initFirestore, addDoc, collection, getFirestore } from "@/services/firebase";
-import { firebaseApp } from "@/services/firebase";
+import { initFirestore, collection, getFirestore } from "@/services/firebase";
+import { firebaseApp, createDocument } from "@/services/firebase";
+import { useRouter } from 'next/navigation';
+import { Home } from "lucide-react";
+import Link from "next/link";
+import { addDoc } from "firebase/firestore";
 
 const formSchema = z.object({
   name: z.string().min(2, {
@@ -49,6 +53,7 @@ const RequestReferralPage = () => {
       otp: "",
     },
   });
+  const router = useRouter();
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     if (isOtpSent) {
@@ -71,6 +76,13 @@ const RequestReferralPage = () => {
             jobId: values.jobId,
             resumeUrl: uploadedResumeUrl,
           });
+          /* await createDocument('referralRequests',values.email, {
+             name: values.name,
+             email: values.email,
+             targetCompany: values.targetCompany,
+             jobId: values.jobId,
+             resumeUrl: uploadedResumeUrl,
+           });*/
 
           // Send email
           await sendEmail({
@@ -83,6 +95,8 @@ const RequestReferralPage = () => {
             title: "Referral Request Submitted!",
             description: "We have received your referral request and will process it soon.",
           });
+
+          router.push('/');
         } catch (error) {
           console.error("Error submitting referral request:", error);
           toast({

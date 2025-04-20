@@ -2,6 +2,7 @@
 // Import the functions you need from the SDKs you need
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc, setDoc, getDoc } from "firebase/firestore";
+import { addDoc, collection } from "firebase/firestore";
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
@@ -26,12 +27,12 @@ export const initFirestore = () => {
 export const createDocument = async (collectionName: string, documentId: string, data: any) => {
   try {
     await initFirestore();
-    await setDoc(doc(db, collectionName, documentId), data)
+    await setDoc(doc(db, collectionName, documentId), data);
     console.log("Document written with ID: ", documentId);
   } catch (e) {
     console.error("Error adding document: ", e);
   }
-  
+
 };
 
 // Function to get a document from a collection
@@ -46,3 +47,5 @@ export const getDocument = async (collectionName: string, documentId: string) =>
     return null;
   }
 };
+
+export { collection, getFirestore };
