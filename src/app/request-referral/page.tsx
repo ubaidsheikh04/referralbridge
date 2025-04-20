@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
 import { uploadFile } from "@/services/file-upload";
 import { sendEmail } from "@/services/email";
-import { initFirestore, getFirestore, firebaseApp } from "@/services/firebase";
+import {  getFirestore, firebaseApp } from "@/services/firebase";
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
