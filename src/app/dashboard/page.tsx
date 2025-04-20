@@ -66,6 +66,8 @@ const DashboardPage = () => {
                 <li key={request.id}>
                   <p>Name: {request.name}</p>
                   <p>Email: {request.email}</p>
+                  <p>Company: {request.targetCompany}</p>
+                  <p>Job ID: {request.jobId}</p>
                 </li>
               ))}
             </ul>

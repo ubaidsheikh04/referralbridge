@@ -17,7 +17,7 @@ export default function Home() {
           </span>
           ReferralBridge
         </h1>
-        <p className="text-near-white text-lg mb-10">
+        <p className="text-foreground text-lg mb-10">
           Welcome to ReferralBridge, your platform for seamless referrals.
         </p>
         <div className="flex flex-col sm:flex-row justify-center space-y-4 sm:space-y-0 sm:space-x-4">

@@ -11,6 +11,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
 import { uploadFile } from "@/services/file-upload";
 import { sendEmail } from "@/services/email";
+import { addDoc, collection, getFirestore } from "firebase/firestore";
+import { firebaseApp } from "@/services/firebase";
 
 const formSchema = z.object({
   name: z.string().min(2, {
@@ -60,6 +62,17 @@ const RequestReferralPage = () => {
           const uploadedResumeUrl = await uploadFile(resumeFile);
           setResumeUrl(uploadedResumeUrl);
 
+          // Add the referral request to Firestore
+          const db = getFirestore(firebaseApp);
+          const referralCollection = collection(db, 'referralRequests');
+          await addDoc(referralCollection, {
+            name: values.name,
+            email: values.email,
+            targetCompany: values.targetCompany,
+            jobId: values.jobId,
+            resumeUrl: uploadedResumeUrl,
+          });
+
           // Send email
           await sendEmail({
             to: values.email,
@@ -89,32 +102,6 @@ const RequestReferralPage = () => {
       }
     } else {
       // Send OTP
-      const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
-      //setOtp(generatedOtp);
-      setEmail(values.email);
-
-      // Send OTP via email
-      // try {
-      //   await sendEmail({
-      //   to: values.email,
-      //   subject: "OTP Verification",
-      //   body: `Your OTP is: ${generatedOtp}`,
-      //   });
-
-      //   setIsOtpSent(true);
-      //   form.setValue("email", values.email); // Persist the email value
-      //   toast({
-      //   title: "OTP Sent!",
-      //   description: "Please check your email to verify your email address.",
-      //   });
-      // } catch (error) {
-      //   console.error("Error sending OTP:", error);
-      //   toast({
-      //   variant: "destructive",
-      //   title: "Error",
-      //   description: "Failed to send OTP. Please try again.",
-      //   });
-      // }
        setIsOtpSent(true);
             form.setValue("email", values.email); // Persist the email value
             toast({
@@ -149,7 +136,7 @@ const RequestReferralPage = () => {
               <FormItem>
                 <FormLabel>Email</FormLabel>
                 <FormControl>
-                  <Input placeholder="Enter your email" {...field} disabled={isOtpSent} value={field.value} onChange={field.onChange} />
+                  <Input placeholder="Enter your email" {...field} disabled={isOtpSent}  onChange={field.onChange} value={field.value}/>
                 </FormControl>
                 <FormMessage />
               </FormItem>

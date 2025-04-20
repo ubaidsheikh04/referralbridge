@@ -1,10 +1,16 @@
 // src/services/firebase.ts
 // Import the functions you need from the SDKs you need
 import { initializeApp } from "firebase/app";
+import { getFirestore, doc, setDoc, getDoc } from "firebase/firestore";
+import { getFirestore, doc, setDoc, getDoc } from "firebase/firestore";
 // TODO: Add SDKs for Firebase products that you want to use
 // https://firebase.google.com/docs/web/setup#available-libraries
 
 // Your web app's Firebase configuration
+
+
+
+
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
   apiKey: "YOUR_API_KEY",
@@ -16,5 +22,34 @@ const firebaseConfig = {
   measurementId: "YOUR_MEASUREMENT_ID"
 };
 
-// Initialize Firebase
-export const firebaseApp = initializeApp(firebaseConfig);
+let db: any;
+let firebaseApp: any;
+export const initFirestore = () => {
+  firebaseApp = initializeApp(firebaseConfig);
+  db = getFirestore(firebaseApp);
+};
+
+// Function to create a document in a collection
+export const createDocument = async (collectionName: string, documentId: string, data: any) => {
+  try {
+    await initFirestore();
+    await setDoc(doc(db, collectionName, documentId), data)
+    console.log("Document written with ID: ", documentId);
+  } catch (e) {
+    console.error("Error adding document: ", e);
+  }
+  
+};
+
+// Function to get a document from a collection
+export const getDocument = async (collectionName: string, documentId: string) => {
+  try {
+    await initFirestore();
+    const docRef = doc(db, collectionName, documentId)
+    const docSnap = await getDoc(docRef);
+    return docSnap.exists() ? docSnap.data() : null;
+  } catch (e) {
+    console.error("Error getting document: ", e);
+    return null;
+  }
+};
