@@ -26,12 +26,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+    <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
+      <body className="antialiased" >
         <header className="bg-secondary py-4 px-6 flex items-center justify-between">
-          <Link href="/" className="text-2xl font-bold text-primary flex items-center">
-            <Rocket className="inline-block h-6 w-6 mr-2" />
-            ReferralBridge
+          <Link
+            href="/"
+            className="text-2xl font-bold text-primary flex items-center"
+          >
+            <Rocket className="inline-block h-6 w-6 mr-2" /> ReferralBridge
           </Link>
         </header>
         {children}

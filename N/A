@@ -1,0 +1,12 @@
+
+If Verification Succeeds (Backend): The verification API will return a success status to the frontend.
+Frontend Action on Success: Inside the handler function, upon receiving success confirmation from the verification API:
+Proceed with the original logic: Upload the resume file using uploadFile.
+Save the referral request data to Firestore using addDoc. Crucially, I will now include payment details (like paymentId, orderId, and maybe paymentStatus: 'completed') in the data being saved.
+Show the success toast message.
+Redirect the user to the /thank-you page.
+If Verification Fails (Backend) or Payment Fails/Cancelled (Frontend):
+The backend verification API returns a failure status, or the Razorpay modal triggers an error/close event.
+The frontend will display an appropriate error toast message to the user (e.g., "Payment failed or cancelled. Please try again.").
+The referral data will not be saved to Firestore.
+The user will not be redirected.

@@ -20,8 +20,8 @@ const ReferralRequestTile: React.FC<ReferralRequestTileProps> = ({ request }) =>
 
     return (
         <div 
-            className={`border rounded-lg p-4 shadow-md bg-black ${isExpanded ? "bg-gray-100 text-black" : "text-white"} ${
-                isExpanded ? "bg-gray-100" : ""
+            className={`border rounded-lg p-4 shadow-md bg-black ${isExpanded ? "bg-black" : "text-white"} ${
+                isExpanded ? "bg-black" : "text-white"
         } ${!isExpanded ? "h-[100px]" : ""}`}
         onClick={toggleExpanded}
       >
@@ -29,7 +29,7 @@ const ReferralRequestTile: React.FC<ReferralRequestTileProps> = ({ request }) =>
           {request.name}
             </p>
         {isExpanded && (
-          <div className='text-white'>
+          <div className="bg-black text-white" >
             <p>
           {request.name}
             </p>
