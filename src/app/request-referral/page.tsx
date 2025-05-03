@@ -23,7 +23,8 @@ const formSchema = z.object({
   email: z.string().email({ message: "Invalid email address." }),
   targetCompany: z.string().min(2, { message: "Company name must be at least 2 characters." }),
   jobId: z.string().min(1, { message: "Job ID/Referral ID cannot be empty." }).describe("Check details in job openings"),
-  resume: z.instanceof(FileList).refine(files => files?.length === 1 && files[0].size > 0, "Resume is required."),
+  // Use z.any() for SSR compatibility, validation handled client-side/in handler
+  resume: z.any().refine(files => typeof window === 'undefined' || (files instanceof FileList && files?.length === 1 && files[0].size > 0), "Resume is required."),
   otp: z.string().optional(),
 });
 
@@ -96,6 +97,24 @@ const RequestReferralPage = () => {
     const otp = form.getValues("otp");
     const expectedOtp = "123456"; // The fixed OTP used for testing
 
+    // Client-side check for resume file before proceeding
+    const resumeFiles = form.getValues("resume");
+    if (!(resumeFiles instanceof FileList) || resumeFiles.length === 0 || resumeFiles[0].size === 0) {
+        form.setError("resume", { type: "manual", message: "Resume file is required." });
+        toast({ variant: "destructive", title: "Error", description: "Please upload your resume." });
+        setIsLoading(false);
+        return;
+    }
+    // Optional: Add file type check here if needed
+    const allowedTypes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+    if (!allowedTypes.includes(resumeFiles[0].type)) {
+        form.setError("resume", { type: "manual", message: "Invalid file type. Please upload PDF or DOCX." });
+        toast({ variant: "destructive", title: "Error", description: "Invalid file type. Please upload PDF or DOCX." });
+        setIsLoading(false);
+        return;
+    }
+
+
     if (otp === expectedOtp) {
       setIsVerified(true); // Mark email as verified
       setReferralData(form.getValues()); // Store form data before payment attempt
@@ -131,8 +150,8 @@ const RequestReferralPage = () => {
         setIsLoading(false); // Stop loading
         return;
     }
-    // Ensure resume is selected
-    if (!currentReferralData.resume || currentReferralData.resume.length === 0 || currentReferralData.resume[0].size === 0) {
+    // Ensure resume is selected (redundant check, already in handleVerifyOtp, but safe)
+    if (!(currentReferralData.resume instanceof FileList) || currentReferralData.resume.length === 0 || currentReferralData.resume[0].size === 0) {
         toast({
             variant: 'destructive',
             title: 'Error',
@@ -147,6 +166,7 @@ const RequestReferralPage = () => {
     let response; // Declare response outside try block
     try {
       console.log("Attempting to create Razorpay order...");
+      // Ensure API route matches the App Router structure
       response = await fetch('/api/razorpay', {
         method: 'POST',
         headers: {
@@ -170,7 +190,7 @@ const RequestReferralPage = () => {
              console.error("API Error Response Text:", responseBody);
              errorData = { error: responseBody || `Failed to create Razorpay order. Status: ${response.status}` };
          }
-         throw new Error(errorData.error);
+         throw new Error(errorData.error || 'Failed to create Razorpay order.');
       }
 
       const data = await response.json();
@@ -179,17 +199,19 @@ const RequestReferralPage = () => {
         throw new Error("Received invalid order data from server.");
       }
       setOrderId(data.orderId);
-      setRazorpayKey(data.keyId);
+      setRazorpayKey(data.keyId); // Store the received keyId
 
       // Ensure Razorpay script is loaded before initiating payment
       if (typeof window !== 'undefined' && (window as any).Razorpay) {
            console.log("Razorpay script loaded, initiating payment...");
+           // Pass the correct keyId obtained from the API response
            handlePayment(data.keyId, data.orderId);
            // handlePayment will set isLoading to false on completion/failure
        } else {
            console.error("Razorpay script not loaded yet. Attempting to load...");
            loadRazorpayScript(() => {
                console.log("Razorpay script loaded via callback, initiating payment...");
+                // Pass the correct keyId obtained from the API response
                handlePayment(data.keyId, data.orderId);
            });
            toast({
@@ -225,7 +247,8 @@ const RequestReferralPage = () => {
         setIsLoading(false);
         return;
     }
-    if (!currentReferralData.resume || currentReferralData.resume.length === 0 || currentReferralData.resume[0].size === 0) {
+    // Use instanceof check for FileList
+     if (!(currentReferralData.resume instanceof FileList) || currentReferralData.resume.length === 0 || currentReferralData.resume[0].size === 0) {
         console.error("Resume file is missing in handlePayment");
         toast({ variant: "destructive", title: "Error", description: "Resume file is missing or invalid." });
         setIsLoading(false);
@@ -233,7 +256,7 @@ const RequestReferralPage = () => {
     }
 
     const options = {
-        key: keyId,
+        key: keyId, // Use the keyId passed to the function
         amount: 10000, // Amount in paise
         currency: "INR",
         name: "ReferralBridge",
