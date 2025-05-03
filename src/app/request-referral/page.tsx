@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -10,7 +9,7 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
 import { uploadFile } from "@/services/file-upload";
-import { sendEmail } from "@/services/email";
+// import { sendEmail } from "@/services/email"; // Email sending commented out for testing
 import { addDoc, collection, getFirestore } from "firebase/firestore";
 import { firebaseApp } from "@/services/firebase";
 import { useRouter } from 'next/navigation';
@@ -145,9 +144,10 @@ const RequestReferralPage = () => {
 
     setReferralData(currentReferralData); // Store the latest data just before payment attempt
 
+    let response; // Declare response outside try block
     try {
       console.log("Attempting to create Razorpay order...");
-      const response = await fetch('/api/razorpay', {
+      response = await fetch('/api/razorpay', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -158,19 +158,19 @@ const RequestReferralPage = () => {
 
 
       if (!response.ok) {
-        let errorData = { error: `HTTP error! status: ${response.status}` };
-        try {
-            // Try to parse error response as JSON
-            const errorJson = await response.json();
-             console.error("API Error Response JSON:", errorJson);
-            errorData = errorJson;
-        } catch (e) {
-            // If response is not JSON, read as text
-            const errorText = await response.text();
-             console.error("API Error Response Text:", errorText);
-            errorData = { error: errorText || `Failed to create Razorpay order. Status: ${response.status}` };
-        }
-        throw new Error(errorData.error);
+         // Read the body once here
+         const responseBody = await response.text();
+         let errorData = { error: `HTTP error! status: ${response.status}` };
+         try {
+             // Try to parse the already read body as JSON
+             errorData = JSON.parse(responseBody);
+             console.error("API Error Response JSON:", errorData);
+         } catch (e) {
+             // If parsing failed, use the text body
+             console.error("API Error Response Text:", responseBody);
+             errorData = { error: responseBody || `Failed to create Razorpay order. Status: ${response.status}` };
+         }
+         throw new Error(errorData.error);
       }
 
       const data = await response.json();
@@ -243,6 +243,7 @@ const RequestReferralPage = () => {
             console.log("Payment Success Response:", response);
             // Payment successful: Upload file and save data
             try {
+                setIsLoading(true); // Start loading for post-payment processing
                 const resumeFile = currentReferralData.resume![0];
                 console.log("Uploading resume:", resumeFile.name);
                 const uploadedResumeUrl = await uploadFile(resumeFile);
@@ -286,7 +287,7 @@ const RequestReferralPage = () => {
             targetCompany: currentReferralData.targetCompany,
             jobId: currentReferralData.jobId,
         },
-        theme: { color: "#FBBF24" },
+        theme: { color: "#008080" }, // Updated theme color to Teal
         modal: {
             ondismiss: function() {
                 console.log('Checkout form closed by user.');
@@ -299,6 +300,13 @@ const RequestReferralPage = () => {
     };
 
     try {
+        // Ensure Razorpay object exists on window
+         if (!(window as any).Razorpay) {
+             console.error("Razorpay object not found on window. Cannot initiate payment.");
+             toast({ variant: "destructive", title: "Error", description: "Payment gateway not loaded. Please refresh." });
+             setIsLoading(false);
+             return;
+         }
         const rzp = new (window as any).Razorpay(options);
         rzp.on('payment.failed', function (response: any) {
             console.error('Payment Failed:', response.error);
