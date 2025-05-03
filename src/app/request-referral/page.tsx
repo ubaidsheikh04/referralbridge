@@ -22,7 +22,7 @@ const formSchema = z.object({
   targetCompany: z.string().min(2, { message: "Company name must be at least 2 characters." }),
   jobId: z.string().min(1, { message: "Job ID/Referral ID cannot be empty." }).describe("Check details in job openings"),
   // Use z.any() for SSR compatibility, validation handled client-side/in handler
-  resume: z.any().refine(files => typeof window === 'undefined' || (files instanceof FileList && files?.length === 1 && files[0].size > 0), "Resume is required."),
+  resume: z.any().refine(files => typeof window === 'undefined' || (files instanceof FileList && files?.length === 1 && files[0].size > 0 && ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'].includes(files[0].type)), "Resume (PDF or DOCX) is required."),
   otp: z.string().optional(),
 });
 
@@ -36,7 +36,6 @@ const RequestReferralPage = () => {
   const [isVerified, setIsVerified] = useState(false); // Track if email is verified
   const [orderId, setOrderId] = useState<string | null>(null);
   const [razorpayKey, setRazorpayKey] = useState<string | null>(null);
-  // const [referralData, setReferralData] = useState<ReferralFormValues | null>(null); // Store form data temporarily - No longer needed here
   const [isLoading, setIsLoading] = useState(false); // Loading state for async operations
   const [createdDocId, setCreatedDocId] = useState<string | null>(null); // Store Firestore doc ID
 
@@ -131,7 +130,6 @@ const RequestReferralPage = () => {
 
     if (otp === expectedOtp) {
       setIsVerified(true); // Mark email as verified
-      // setReferralData(form.getValues()); // Store form data before payment attempt - No longer needed here
       toast({
         title: "Email Verified!",
         description: "Proceeding to payment...",
@@ -176,8 +174,6 @@ const RequestReferralPage = () => {
     }
 
 
-    // setReferralData(currentReferralData); // Store the latest data just before payment attempt - No longer needed here
-
     let response; // Declare response outside try block
     try {
       console.log("Attempting to create Razorpay order...");
@@ -187,6 +183,7 @@ const RequestReferralPage = () => {
         headers: {
           'Content-Type': 'application/json',
         },
+        // Use 10000 for 100 INR
         body: JSON.stringify({ amount: 10000 }), // amount in paise (100 INR)
       });
       console.log("Response status:", response.status);
@@ -195,6 +192,7 @@ const RequestReferralPage = () => {
       if (!response.ok) {
          // Read the body once here
          const responseBody = await response.text();
+         console.error("API Error Response Text:", responseBody); // Log the raw response
          let errorData = { error: `HTTP error! status: ${response.status}` };
          try {
              // Try to parse the already read body as JSON
@@ -202,7 +200,6 @@ const RequestReferralPage = () => {
              console.error("API Error Response JSON:", errorData);
          } catch (e) {
              // If parsing failed, use the text body
-             console.error("API Error Response Text:", responseBody);
              errorData = { error: responseBody || `Failed to create Razorpay order. Status: ${response.status}` };
          }
          // Throw the parsed/text error message
@@ -246,7 +243,6 @@ const RequestReferralPage = () => {
         description: error.message || 'Failed to create payment order. Please try again.',
       });
        setIsVerified(false); // Reset verification on payment error
-       // setReferralData(null); // Clear stored data - No longer needed here
        setIsLoading(false); // Stop loading on error
     }
   };
@@ -255,6 +251,7 @@ const RequestReferralPage = () => {
   const verifyRazorpayPayment = async (razorpay_payment_id: string, razorpay_order_id: string, razorpay_signature: string) => {
       try {
           console.log("Attempting to verify Razorpay payment...");
+          // Ensure the API route matches the App Router structure
           const response = await fetch('/api/razorpay/verify-payment', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -262,14 +259,18 @@ const RequestReferralPage = () => {
           });
           if (!response.ok) {
               const errorData = await response.json();
-              console.error("API Error Response JSON:", errorData);
-              throw new Error(`Failed to verify payment: ${response.status}`);
+              console.error("Payment Verification API Error:", errorData);
+              // Don't throw error here, let the saving proceed but log the verification failure
+              toast({ variant: 'destructive', title: 'Payment Verification Failed', description: errorData.error || 'Server could not verify payment.' });
+              return false; // Indicate verification failure
           }
           const data = await response.json();
-          console.log("Razorpay Payment Verification Data:", data); // Handle verification response
+          console.log("Razorpay Payment Verification Success:", data); // Handle verification response
+          return true; // Indicate verification success
       } catch (error) {
           console.error("Error during verifyRazorpayPayment:", error);
-          return;
+          toast({ variant: 'destructive', title: 'Verification Error', description: 'Could not reach verification server.' });
+          return false; // Indicate verification failure
       }
   };
 
@@ -278,8 +279,6 @@ const RequestReferralPage = () => {
  // Modified signature to accept referralData
  const handlePayment = (keyId: string, orderId: string, currentReferralData: ReferralFormValues) => {
     console.log("Initiating Payment with Key:", keyId, "Order ID:", orderId);
-    // Use the data passed as argument
-    // const currentReferralData = referralData; // Use the data stored just before createRazorpayOrder - Removed
 
     if (!currentReferralData) {
         console.error("Referral data is null in handlePayment");
@@ -304,11 +303,22 @@ const RequestReferralPage = () => {
         order_id: orderId,
         handler: async function (response: any) {
             console.log("Payment Success Response:", response);
-            // Payment successful: Upload file and save data
+            setIsLoading(true); // Start loading for post-payment processing
+
             try {
-                setIsLoading(true); // Start loading for post-payment processing
-                // Ensure resume is FileList and has a file client-side
-                 if (typeof window === 'undefined' || !(currentReferralData.resume instanceof FileList && currentReferralData.resume.length === 1)){
+                 // Verify payment on the backend FIRST
+                const isPaymentVerified = await verifyRazorpayPayment(response.razorpay_payment_id, response.razorpay_order_id, response.razorpay_signature);
+
+                if (!isPaymentVerified) {
+                    // If verification fails, show error and DO NOT save/redirect
+                    toast({ variant: "destructive", title: "Payment Failed", description: "Your payment could not be verified. Please contact support." });
+                    setIsVerified(false); // Reset verification status
+                    setIsLoading(false);
+                    return; // Stop execution here
+                }
+
+                // Payment verified, proceed with file upload and Firestore save
+                if (typeof window === 'undefined' || !(currentReferralData.resume instanceof FileList && currentReferralData.resume.length === 1)){
                      throw new Error("Invalid resume data for upload");
                  }
                 const resumeFile = currentReferralData.resume[0];
@@ -319,8 +329,8 @@ const RequestReferralPage = () => {
 
                 const db = getFirestore(firebaseApp);
                 const referralCollection = collection(db, 'referralRequests');
-                console.log("Saving paid referral to Firestore:", currentReferralData);
-                // Save initial data without payment status
+                console.log("Saving verified & paid referral to Firestore:", currentReferralData);
+                // Save data after successful payment verification
                 const docRef = await addDoc(referralCollection, {
                     name: currentReferralData.name,
                     email: currentReferralData.email,
@@ -330,14 +340,14 @@ const RequestReferralPage = () => {
                     paymentId: response.razorpay_payment_id,
                     orderId: response.razorpay_order_id,
                     paymentSignature: response.razorpay_signature,
-                    paymentStatus: 'paid', // Set status to paid immediately
+                    paymentStatus: 'paid', // Set status to paid
                     timestamp: new Date()
                 });
                 console.log("Firestore save successful for paid referral with doc ID:", docRef.id);
-                await verifyRazorpayPayment(response.razorpay_payment_id, response.razorpay_order_id, response.razorpay_signature)
 
+                // Now show success toast and redirect
                 toast({ title: "Payment Successful!", description: "Your referral request has been submitted." });
-                setTimeout(() => { router.push('/thank-you'); }, 500);
+                setTimeout(() => { router.push('/thank-you'); }, 500); // Redirect after a short delay
 
             } catch (error) {
                 console.error("Error processing successful payment:", error);
@@ -357,13 +367,12 @@ const RequestReferralPage = () => {
             targetCompany: currentReferralData.targetCompany,
             jobId: currentReferralData.jobId,
         },
-        theme: { color: "#008080" }, // Updated theme color to Teal
+        theme: { color: "#FDB813" }, // Updated theme color to match yellow
         modal: {
             ondismiss: function() {
                 console.log('Checkout form closed by user.');
                 toast({ variant: "default", title: "Payment Cancelled", description: "Your payment was not completed." });
                 setIsVerified(false); // Reset verification status
-                // setReferralData(null); // Clear stored data - No longer needed here
                 setCreatedDocId(null); // Clear Firestore doc ID if payment cancelled
                 setIsLoading(false); // Stop loading
             }
@@ -387,7 +396,6 @@ const RequestReferralPage = () => {
                 description: response.error.description || 'An unknown error occurred during payment.',
             });
              setIsVerified(false); // Reset verification status
-             // setReferralData(null); // Clear stored data - No longer needed here
              setCreatedDocId(null); // Clear Firestore doc ID on payment failure
              setIsLoading(false); // Stop loading
         });
@@ -396,7 +404,6 @@ const RequestReferralPage = () => {
         console.error("Error opening Razorpay checkout:", e);
         toast({ variant: "destructive", title: "Payment Error", description: "Could not initiate payment gateway. Please try again." });
         setIsVerified(false);
-        // setReferralData(null); // Clear stored data - No longer needed here
         setCreatedDocId(null);
         setIsLoading(false); // Stop loading
     }
@@ -428,6 +435,7 @@ const RequestReferralPage = () => {
       return { text: "Verify OTP & Proceed to Pay", action: handleVerifyOtp, disabled: isLoading || !form.getValues("otp") || form.getValues("otp")?.length !== 6 };
     } else {
        // Step 3: Payment is in progress or completed
+       // Show loading state while payment/verification/saving is happening
        return { text: "Processing Payment...", action: () => {}, disabled: true };
     }
   };
@@ -627,3 +635,5 @@ const RequestReferralPage = () => {
 };
 
 export default RequestReferralPage;
+
+    
