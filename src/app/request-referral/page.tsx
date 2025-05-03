@@ -9,13 +9,11 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
 import { uploadFile } from "@/services/file-upload";
-// import { sendEmail } from "@/services/email"; // Email sending commented out for testing
-import { addDoc, collection, getFirestore } from "firebase/firestore";
+import { sendEmail } from "@/services/email"; // Email sending commented out for testing
+import { addDoc, collection, getFirestore, updateDoc, doc } from "firebase/firestore";
 import { firebaseApp } from "@/services/firebase";
 import { useRouter } from 'next/navigation';
 import Script from 'next/script';
-// Removed unused ArrowLeft import
-// import { ArrowLeft } from 'lucide-react';
 
 // Define the Zod schema for the form
 const formSchema = z.object({
@@ -36,6 +34,7 @@ const RequestReferralPage = () => {
   const [razorpayKey, setRazorpayKey] = useState<string | null>(null);
   const [referralData, setReferralData] = useState<z.infer<typeof formSchema> | null>(null); // Store form data temporarily
   const [isLoading, setIsLoading] = useState(false); // Loading state for async operations
+  const [createdDocId, setCreatedDocId] = useState<string | null>(null); // Store Firestore doc ID
 
 
   const router = useRouter();
@@ -72,7 +71,7 @@ const RequestReferralPage = () => {
        // Simulate sending email for testing
        console.log(`Simulating OTP send to ${email}. OTP: ${generatedOtp}`);
        // Uncomment the line below to enable actual email sending when service is ready
-       // await sendEmail({ to: email, subject: "Referral Request OTP Verification", body: `Your OTP is: ${generatedOtp}` });
+       // await sendEmail({ to : email, subject : "Referral Request OTP Verification", body : `Your OTP is: ${generatedOtp}` });
 
       setIsOtpSent(true);
       toast({
@@ -97,22 +96,33 @@ const RequestReferralPage = () => {
     const otp = form.getValues("otp");
     const expectedOtp = "123456"; // The fixed OTP used for testing
 
-    // Client-side check for resume file before proceeding
+    // --- Client-side resume validation ---
     const resumeFiles = form.getValues("resume");
-    if (!(resumeFiles instanceof FileList) || resumeFiles.length === 0 || resumeFiles[0].size === 0) {
+    let resumeIsValid = false;
+    if (typeof window !== 'undefined' && resumeFiles instanceof FileList && resumeFiles.length === 1) {
+        const file = resumeFiles[0];
+        if (file.size > 0) {
+             const allowedTypes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+             if (allowedTypes.includes(file.type)) {
+                 resumeIsValid = true;
+             } else {
+                 form.setError("resume", { type: "manual", message: "Invalid file type. Please upload PDF or DOCX." });
+                 toast({ variant: "destructive", title: "Error", description: "Invalid file type. Please upload PDF or DOCX." });
+             }
+        } else {
+             form.setError("resume", { type: "manual", message: "Resume file cannot be empty." });
+             toast({ variant: "destructive", title: "Error", description: "Resume file cannot be empty." });
+        }
+    } else {
         form.setError("resume", { type: "manual", message: "Resume file is required." });
         toast({ variant: "destructive", title: "Error", description: "Please upload your resume." });
-        setIsLoading(false);
-        return;
     }
-    // Optional: Add file type check here if needed
-    const allowedTypes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
-    if (!allowedTypes.includes(resumeFiles[0].type)) {
-        form.setError("resume", { type: "manual", message: "Invalid file type. Please upload PDF or DOCX." });
-        toast({ variant: "destructive", title: "Error", description: "Invalid file type. Please upload PDF or DOCX." });
+
+    if (!resumeIsValid) {
         setIsLoading(false);
-        return;
+        return; // Stop if resume is invalid
     }
+    // --- End of client-side resume validation ---
 
 
     if (otp === expectedOtp) {
@@ -150,8 +160,8 @@ const RequestReferralPage = () => {
         setIsLoading(false); // Stop loading
         return;
     }
-    // Ensure resume is selected (redundant check, already in handleVerifyOtp, but safe)
-    if (!(currentReferralData.resume instanceof FileList) || currentReferralData.resume.length === 0 || currentReferralData.resume[0].size === 0) {
+    // Ensure resume is valid client-side before proceeding (already checked in handleVerifyOtp, but safe)
+     if (typeof window === 'undefined' || !(currentReferralData.resume instanceof FileList && currentReferralData.resume.length === 1 && currentReferralData.resume[0].size > 0)) {
         toast({
             variant: 'destructive',
             title: 'Error',
@@ -161,13 +171,14 @@ const RequestReferralPage = () => {
         return;
     }
 
+
     setReferralData(currentReferralData); // Store the latest data just before payment attempt
 
     let response; // Declare response outside try block
     try {
       console.log("Attempting to create Razorpay order...");
       // Ensure API route matches the App Router structure
-      response = await fetch('/api/razorpay', {
+      response = await fetch('/api/razorpay', { // Updated to use App Router API route
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -190,6 +201,7 @@ const RequestReferralPage = () => {
              console.error("API Error Response Text:", responseBody);
              errorData = { error: responseBody || `Failed to create Razorpay order. Status: ${response.status}` };
          }
+         // Throw the parsed/text error message
          throw new Error(errorData.error || 'Failed to create Razorpay order.');
       }
 
@@ -247,9 +259,9 @@ const RequestReferralPage = () => {
         setIsLoading(false);
         return;
     }
-    // Use instanceof check for FileList
-     if (!(currentReferralData.resume instanceof FileList) || currentReferralData.resume.length === 0 || currentReferralData.resume[0].size === 0) {
-        console.error("Resume file is missing in handlePayment");
+    // Use instanceof check for FileList, ensure it runs only client-side
+     if (typeof window === 'undefined' || !(currentReferralData.resume instanceof FileList && currentReferralData.resume.length === 1 && currentReferralData.resume[0].size > 0)) {
+        console.error("Resume file is missing or invalid in handlePayment");
         toast({ variant: "destructive", title: "Error", description: "Resume file is missing or invalid." });
         setIsLoading(false);
         return;
@@ -267,7 +279,11 @@ const RequestReferralPage = () => {
             // Payment successful: Upload file and save data
             try {
                 setIsLoading(true); // Start loading for post-payment processing
-                const resumeFile = currentReferralData.resume![0];
+                // Ensure resume is FileList and has a file client-side
+                 if (typeof window === 'undefined' || !(currentReferralData.resume instanceof FileList && currentReferralData.resume.length === 1)){
+                     throw new Error("Invalid resume data for upload");
+                 }
+                const resumeFile = currentReferralData.resume[0];
                 console.log("Uploading resume:", resumeFile.name);
                 const uploadedResumeUrl = await uploadFile(resumeFile);
                 console.log("Resume Uploaded:", uploadedResumeUrl);
@@ -276,7 +292,8 @@ const RequestReferralPage = () => {
                 const db = getFirestore(firebaseApp);
                 const referralCollection = collection(db, 'referralRequests');
                 console.log("Saving paid referral to Firestore:", currentReferralData);
-                await addDoc(referralCollection, {
+                // Save initial data without payment status
+                const docRef = await addDoc(referralCollection, {
                     name: currentReferralData.name,
                     email: currentReferralData.email,
                     targetCompany: currentReferralData.targetCompany,
@@ -285,10 +302,11 @@ const RequestReferralPage = () => {
                     paymentId: response.razorpay_payment_id,
                     orderId: response.razorpay_order_id,
                     paymentSignature: response.razorpay_signature,
-                    paymentStatus: 'paid',
+                    paymentStatus: 'paid', // Set status to paid immediately
                     timestamp: new Date()
                 });
-                console.log("Firestore save successful for paid referral.");
+                console.log("Firestore save successful for paid referral with doc ID:", docRef.id);
+
 
                 toast({ title: "Payment Successful!", description: "Your referral request has been submitted." });
                 setTimeout(() => { router.push('/thank-you'); }, 500);
@@ -296,6 +314,7 @@ const RequestReferralPage = () => {
             } catch (error) {
                 console.error("Error processing successful payment:", error);
                 toast({ variant: "destructive", title: "Post-Payment Error", description: "Payment successful, but failed to save request. Please contact support." });
+                 // Consider if you need to refund or manually handle this case
             } finally {
                 setIsLoading(false); // Stop loading after processing
             }
@@ -317,6 +336,7 @@ const RequestReferralPage = () => {
                 toast({ variant: "default", title: "Payment Cancelled", description: "Your payment was not completed." });
                 setIsVerified(false); // Reset verification status
                 setReferralData(null); // Clear stored data
+                setCreatedDocId(null); // Clear Firestore doc ID if payment cancelled
                 setIsLoading(false); // Stop loading
             }
         }
@@ -324,7 +344,7 @@ const RequestReferralPage = () => {
 
     try {
         // Ensure Razorpay object exists on window
-         if (!(window as any).Razorpay) {
+         if (typeof window === 'undefined' || !(window as any).Razorpay) {
              console.error("Razorpay object not found on window. Cannot initiate payment.");
              toast({ variant: "destructive", title: "Error", description: "Payment gateway not loaded. Please refresh." });
              setIsLoading(false);
@@ -340,6 +360,7 @@ const RequestReferralPage = () => {
             });
              setIsVerified(false); // Reset verification status
              setReferralData(null); // Clear stored data
+             setCreatedDocId(null); // Clear Firestore doc ID on payment failure
              setIsLoading(false); // Stop loading
         });
         rzp.open();
@@ -348,6 +369,7 @@ const RequestReferralPage = () => {
         toast({ variant: "destructive", title: "Payment Error", description: "Could not initiate payment gateway. Please try again." });
         setIsVerified(false);
         setReferralData(null);
+        setCreatedDocId(null);
         setIsLoading(false); // Stop loading
     }
 };
@@ -385,6 +407,9 @@ const RequestReferralPage = () => {
   const buttonConfig = getButtonConfig();
 
   const loadRazorpayScript = (callback?: () => void) => {
+      // Ensure this runs only on the client
+      if (typeof window === 'undefined') return;
+
       const existingScript = document.querySelector('script[src="https://checkout.razorpay.com/v1/checkout.js"]');
       if (existingScript && (window as any).Razorpay) {
           console.log("Razorpay script already loaded.");
@@ -434,12 +459,10 @@ const RequestReferralPage = () => {
       document.body.appendChild(script);
   };
 
-  // Effect to load Razorpay script on component mount
+  // Effect to load Razorpay script on component mount (client-side only)
     useEffect(() => {
         loadRazorpayScript();
-        // Cleanup function is usually not needed for external scripts like this
-        // unless you need to specifically remove it on unmount, which is rare.
-    }, []);
+    }, []); // Empty dependency array ensures it runs once on mount
 
   return (
      <>
@@ -576,3 +599,5 @@ const RequestReferralPage = () => {
 };
 
 export default RequestReferralPage;
+
+    
