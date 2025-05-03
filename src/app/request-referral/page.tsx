@@ -26,19 +26,23 @@ const formSchema = z.object({
   otp: z.string().optional(),
 });
 
+// Type for the form data
+type ReferralFormValues = z.infer<typeof formSchema>;
+
+
 const RequestReferralPage = () => {
   const [resumeUrl, setResumeUrl] = useState<string | null>(null);
   const [isOtpSent, setIsOtpSent] = useState(false);
   const [isVerified, setIsVerified] = useState(false); // Track if email is verified
   const [orderId, setOrderId] = useState<string | null>(null);
   const [razorpayKey, setRazorpayKey] = useState<string | null>(null);
-  const [referralData, setReferralData] = useState<z.infer<typeof formSchema> | null>(null); // Store form data temporarily
+  // const [referralData, setReferralData] = useState<ReferralFormValues | null>(null); // Store form data temporarily - No longer needed here
   const [isLoading, setIsLoading] = useState(false); // Loading state for async operations
   const [createdDocId, setCreatedDocId] = useState<string | null>(null); // Store Firestore doc ID
 
 
   const router = useRouter();
-  const form = useForm<z.infer<typeof formSchema>>({
+  const form = useForm<ReferralFormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: "",
@@ -127,7 +131,7 @@ const RequestReferralPage = () => {
 
     if (otp === expectedOtp) {
       setIsVerified(true); // Mark email as verified
-      setReferralData(form.getValues()); // Store form data before payment attempt
+      // setReferralData(form.getValues()); // Store form data before payment attempt - No longer needed here
       toast({
         title: "Email Verified!",
         description: "Proceeding to payment...",
@@ -172,13 +176,13 @@ const RequestReferralPage = () => {
     }
 
 
-    setReferralData(currentReferralData); // Store the latest data just before payment attempt
+    // setReferralData(currentReferralData); // Store the latest data just before payment attempt - No longer needed here
 
     let response; // Declare response outside try block
     try {
       console.log("Attempting to create Razorpay order...");
       // Ensure API route matches the App Router structure
-      response = await fetch('/api/razorpay', { // Updated to use App Router API route
+      response = await fetch('/api/razorpay/create-order', { // Updated to use App Router API route
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -216,15 +220,15 @@ const RequestReferralPage = () => {
       // Ensure Razorpay script is loaded before initiating payment
       if (typeof window !== 'undefined' && (window as any).Razorpay) {
            console.log("Razorpay script loaded, initiating payment...");
-           // Pass the correct keyId obtained from the API response
-           handlePayment(data.keyId, data.orderId);
+           // Pass the correct keyId obtained from the API response AND the form data
+           handlePayment(data.keyId, data.orderId, currentReferralData);
            // handlePayment will set isLoading to false on completion/failure
        } else {
            console.error("Razorpay script not loaded yet. Attempting to load...");
            loadRazorpayScript(() => {
                console.log("Razorpay script loaded via callback, initiating payment...");
-                // Pass the correct keyId obtained from the API response
-               handlePayment(data.keyId, data.orderId);
+                // Pass the correct keyId obtained from the API response AND the form data
+               handlePayment(data.keyId, data.orderId, currentReferralData);
            });
            toast({
                variant: 'default', // Use default variant for info
@@ -242,16 +246,40 @@ const RequestReferralPage = () => {
         description: error.message || 'Failed to create payment order. Please try again.',
       });
        setIsVerified(false); // Reset verification on payment error
-       setReferralData(null); // Clear stored data
+       // setReferralData(null); // Clear stored data - No longer needed here
        setIsLoading(false); // Stop loading on error
     }
   };
 
+    // Function to verify payment signature with the server
+  const verifyRazorpayPayment = async (razorpay_payment_id: string, razorpay_order_id: string, razorpay_signature: string) => {
+      try {
+          console.log("Attempting to verify Razorpay payment...");
+          const response = await fetch('/api/razorpay/verify-payment', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ razorpay_payment_id, razorpay_order_id, razorpay_signature })
+          });
+          if (!response.ok) {
+              const errorData = await response.json();
+              console.error("API Error Response JSON:", errorData);
+              throw new Error(`Failed to verify payment: ${response.status}`);
+          }
+          const data = await response.json();
+          console.log("Razorpay Payment Verification Data:", data); // Handle verification response
+      } catch (error) {
+          console.error("Error during verifyRazorpayPayment:", error);
+          return;
+      }
+  };
+
 
  // Function to handle the payment process
- const handlePayment = (keyId: string, orderId: string) => {
+ // Modified signature to accept referralData
+ const handlePayment = (keyId: string, orderId: string, currentReferralData: ReferralFormValues) => {
     console.log("Initiating Payment with Key:", keyId, "Order ID:", orderId);
-    const currentReferralData = referralData; // Use the data stored just before createRazorpayOrder
+    // Use the data passed as argument
+    // const currentReferralData = referralData; // Use the data stored just before createRazorpayOrder - Removed
 
     if (!currentReferralData) {
         console.error("Referral data is null in handlePayment");
@@ -306,7 +334,7 @@ const RequestReferralPage = () => {
                     timestamp: new Date()
                 });
                 console.log("Firestore save successful for paid referral with doc ID:", docRef.id);
-
+                await verifyRazorpayPayment(response.razorpay_payment_id, response.razorpay_order_id, response.razorpay_signature)
 
                 toast({ title: "Payment Successful!", description: "Your referral request has been submitted." });
                 setTimeout(() => { router.push('/thank-you'); }, 500);
@@ -335,7 +363,7 @@ const RequestReferralPage = () => {
                 console.log('Checkout form closed by user.');
                 toast({ variant: "default", title: "Payment Cancelled", description: "Your payment was not completed." });
                 setIsVerified(false); // Reset verification status
-                setReferralData(null); // Clear stored data
+                // setReferralData(null); // Clear stored data - No longer needed here
                 setCreatedDocId(null); // Clear Firestore doc ID if payment cancelled
                 setIsLoading(false); // Stop loading
             }
@@ -359,7 +387,7 @@ const RequestReferralPage = () => {
                 description: response.error.description || 'An unknown error occurred during payment.',
             });
              setIsVerified(false); // Reset verification status
-             setReferralData(null); // Clear stored data
+             // setReferralData(null); // Clear stored data - No longer needed here
              setCreatedDocId(null); // Clear Firestore doc ID on payment failure
              setIsLoading(false); // Stop loading
         });
@@ -368,7 +396,7 @@ const RequestReferralPage = () => {
         console.error("Error opening Razorpay checkout:", e);
         toast({ variant: "destructive", title: "Payment Error", description: "Could not initiate payment gateway. Please try again." });
         setIsVerified(false);
-        setReferralData(null);
+        // setReferralData(null); // Clear stored data - No longer needed here
         setCreatedDocId(null);
         setIsLoading(false); // Stop loading
     }
@@ -376,7 +404,7 @@ const RequestReferralPage = () => {
 
 
   // Combined onSubmit handler for the form element - This is NOT used by the buttons directly
-  const handleFormSubmit = async (values: z.infer<typeof formSchema>) => {
+  const handleFormSubmit = async (values: ReferralFormValues) => {
      // This function is technically the form's onSubmit, but the buttons have their own onClick handlers.
      // You might keep this for accessibility (e.g., submitting with Enter key),
      // but the primary logic is in handleVerifyEmail and handleVerifyOtp triggered by button clicks.
@@ -599,5 +627,3 @@ const RequestReferralPage = () => {
 };
 
 export default RequestReferralPage;
-
-    
