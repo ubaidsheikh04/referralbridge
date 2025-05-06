@@ -6,11 +6,14 @@ import crypto from 'crypto';
 // Razorpay key ID and secret from environment variables
 const keyId = process.env.RAZORPAY_KEY_ID;
 const keySecret = process.env.RAZORPAY_KEY_SECRET;
-
-if (!keyId || !keySecret) {
-  throw new Error("RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET must be defined in the environment variables");
+if (!keyId) {
+    throw new Error("RAZORPAY_KEY_ID must be defined in the environment variables");
 }
 
+if (!keySecret || typeof keySecret !== 'string') {
+  throw new Error("RAZORPAY_KEY_SECRET must be defined and be a string in the environment variables");
+
+}
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -27,8 +30,8 @@ export async function POST(request: NextRequest) {
 
     const signatureBody = razorpay_order_id + "|" + razorpay_payment_id;
 
-    const expectedSignature = crypto
-      .createHmac("sha256", keySecret)
+      const expectedSignature = crypto
+      .createHmac("sha256", keySecret as string)
       .update(signatureBody.toString())
       .digest("hex");
 

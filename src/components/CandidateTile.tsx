@@ -1,8 +1,16 @@
-tsx
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ReferralRequest } from "@/services/firebase";
 
-interface CandidateTileProps {
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
+
+export interface ReferralRequest {
+  candidateName: string;
+  additionalInfo: string;
+  candidateEmail: string;
+  referrerName: string;
+  jobTitle: string;
+  resumeLink: string;
+}
+ interface CandidateTileProps {
   referralRequest: ReferralRequest;
 }
 

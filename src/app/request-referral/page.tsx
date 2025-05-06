@@ -238,12 +238,16 @@ const RequestReferralPage = () => {
       });
        setIsVerified(false); // Reset verification on payment error
        setIsLoading(false); // Stop loading on error
+       setIsLoading(false); // Stop loading on error
     }
     // Do not set isLoading to false here; handlePayment will manage it.
   };
 
     // Function to verify payment signature with the server
   const verifyRazorpayPayment = async (razorpay_payment_id: string, razorpay_order_id: string, razorpay_signature: string): Promise<boolean> => {
+      console.log("verifyRazorpayPayment - Parameters:", { razorpay_payment_id, razorpay_order_id, razorpay_signature });
+
+
       try {
           console.log("Attempting to verify Razorpay payment...");
           const response = await fetch('/api/razorpay/verify-payment', {
@@ -253,22 +257,32 @@ const RequestReferralPage = () => {
           });
           if (!response.ok) {
               const errorData = await response.json().catch(() => ({ error: 'Failed to parse verification error response.' })); // Add catch for parsing error
+              console.log("verifyRazorpayPayment - Payment Verification API Response:", errorData);
               console.error("Payment Verification API Error:", errorData);
+              setIsLoading(false);
               toast({ variant: 'destructive', title: 'Payment Verification Failed', description: errorData.error || 'Server could not verify payment.' });
               return false; // Indicate verification failure
           }
           const data = await response.json();
+          console.log("verifyRazorpayPayment - Response Data:", data);
+
+
+          setIsLoading(false);
           console.log("Razorpay Payment Verification Success:", data); // Handle verification response
           return true; // Indicate verification success
+          
       } catch (error) {
           console.error("Error during verifyRazorpayPayment:", error);
           toast({ variant: 'destructive', title: 'Verification Error', description: 'Could not reach verification server.' });
           return false; // Indicate verification failure on network or other errors
+          setIsLoading(false);
       }
   };
 
 
+
  // Function to handle the payment process
+ 
  const handlePayment = (keyId: string, orderId: string, currentReferralData: ReferralFormValues) => {
     console.log("Initiating Payment with Key:", keyId, "Order ID:", orderId);
     // isLoading should be true at this point
@@ -280,6 +294,7 @@ const RequestReferralPage = () => {
         setIsVerified(false); // Reset verification
         return;
     }
+
      if (typeof window === 'undefined' || !(currentReferralData.resume instanceof FileList && currentReferralData.resume.length === 1 && currentReferralData.resume[0].size > 0)) {
         console.error("Resume file is missing or invalid in handlePayment");
         toast({ variant: "destructive", title: "Error", description: "Resume file is missing or invalid." });
@@ -288,11 +303,14 @@ const RequestReferralPage = () => {
         return;
     }
 
+    console.log("handlePayment - Payment options created");
     const options = {
         key: keyId,
         amount: 10000, // Amount in paise
         currency: "INR",
         name: "ReferralBridge",
+
+        
         description: "Referral Request Fee",
         order_id: orderId,
         handler: async function (response: any) {
@@ -304,9 +322,12 @@ const RequestReferralPage = () => {
                  // Verify payment on the backend FIRST
                 isPaymentVerified = await verifyRazorpayPayment(response.razorpay_payment_id, response.razorpay_order_id, response.razorpay_signature);
 
+                console.log("handlePayment - isPaymentVerified:", isPaymentVerified);
                 if (!isPaymentVerified) {
                     // If verification fails, show error and DO NOT save/redirect
                     toast({ variant: "destructive", title: "Payment Failed", description: "Your payment could not be verified. Please contact support." });
+                    console.log("handlePayment - Payment verification failed. Will not redirect or save.");
+                     setIsLoading(false);
                     setIsVerified(false); // Reset verification status
                     // Don't set isLoading false yet, let finally block handle it
                     return; // Stop execution here
@@ -342,15 +363,21 @@ const RequestReferralPage = () => {
 
                 // Now show success toast and redirect
                 toast({ title: "Payment Successful!", description: "Your referral request has been submitted." });
-                setTimeout(() => { router.push('/thank-you'); }, 500); // Redirect after a short delay
+                console.log("handlePayment - Redirecting to /thank-you");
+
+                
+                setTimeout(() => { router.push('/thank-you'); console.log("Redirected");}, 500); // Redirect after a short delay
+                
 
             } catch (error: any) {
                 console.error("Error processing successful payment:", error);
+                console.log("handlePayment - Payment processing failed");
                 const errorMessage = isPaymentVerified
                   ? "Payment successful, but failed to save request. Please contact support."
                   : "Payment verification failed or an error occurred during processing."; // Provide more context if verification failed before this block
                 toast({ variant: "destructive", title: "Post-Payment Error", description: errorMessage });
                 setIsVerified(false); // Reset verification on processing error
+                setIsLoading(false);
                  // Consider if you need to refund or manually handle this case
             } finally {
                 // Ensure isLoading is always set to false after handler finishes or errors out
@@ -372,6 +399,8 @@ const RequestReferralPage = () => {
             ondismiss: function() {
                 console.log('Checkout form closed by user.');
                 toast({ variant: "default", title: "Payment Cancelled", description: "Your payment was not completed." });
+                console.log("handlePayment - Payment Cancelled");
+                 setIsLoading(false);
                 setIsVerified(false); // Reset verification status
                 setIsLoading(false); // Stop loading
             }
@@ -379,12 +408,14 @@ const RequestReferralPage = () => {
     };
 
     try {
+        console.log("handlePayment - Razorpay object created");
         // Ensure Razorpay object exists on window
          if (typeof window === 'undefined' || !(window as any).Razorpay) {
              console.error("Razorpay object not found on window. Cannot initiate payment.");
              toast({ variant: "destructive", title: "Error", description: "Payment gateway not loaded. Please refresh." });
              setIsLoading(false);
              setIsVerified(false); // Reset verification
+              console.log("handlePayment - Razorpay object not found");
              return;
          }
         const rzp = new (window as any).Razorpay(options);
@@ -394,11 +425,14 @@ const RequestReferralPage = () => {
                 variant: "destructive",
                 title: "Payment Failed",
                 description: response.error.description || 'An unknown error occurred during payment.',
-            });
+                
+           });
+            console.log("handlePayment - Payment failed");
              setIsVerified(false); // Reset verification status
              setIsLoading(false); // Stop loading
         });
         rzp.open();
+        console.log("handlePayment - Razorpay openned");
         // Do not set isLoading to false here; it will be handled by handler or ondismiss/failed callbacks
     } catch (e) {
         console.error("Error opening Razorpay checkout:", e);

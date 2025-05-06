@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-
+import { ReferralRequest } from '@/components/CandidateTile';
+  
 interface ReferralRequestTileProps {
     request: {
         id: string;
