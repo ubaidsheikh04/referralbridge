@@ -25,13 +25,13 @@ export default function Home() {
             href="/request-referral"
             className="bg-accent text-accent-foreground hover:bg-accent/80 px-6 py-3 rounded-full font-medium transition-colors duration-300 shadow-md transform hover:-translate-y-1"
           >
-            Request a Referral
+            I want a referral
           </Link>
           <Link
             href="/referrer-signup"
             className="bg-accent text-accent-foreground hover:bg-accent/80 px-6 py-3 rounded-full font-medium transition-colors duration-300 shadow-md transform hover:-translate-y-1"
           >
-            Referrer Signup
+            I want to refer someone
           </Link>
         </div>
         <div className="absolute bottom-0 left-0 w-full h-48 bg-gradient-to-t from-secondary to-transparent"></div>
