@@ -8,6 +8,9 @@ import { collection, getDocs, query, where, doc, updateDoc } from "firebase/fire
 import { db } from "@/services/firebase";
 import ReferralRequestTile from "@/components/ReferralRequestTile";
 import { toast } from "@/hooks/use-toast";
+import Link from 'next/link';
+import { Button } from '@/components/ui/button';
+import { HomeIcon } from 'lucide-react';
 
 // Define the shape of a referral request
 interface ReferralRequestData {
@@ -18,6 +21,7 @@ interface ReferralRequestData {
   jobId: string;
   resumeUrl?: string;
   status?: 'pending' | 'referred' | 'rejected'; // Add status field
+  paymentStatus?: string;
 }
 
 const DashboardPage = () => {
@@ -38,11 +42,10 @@ const DashboardPage = () => {
     if (company) {
       const fetchReferralRequests = async () => {
         setIsLoading(true); // Start loading when fetching
-        const referralCollection = collection(db, 'referralRequests')
+        const referralCollectionRef = collection(db, 'referralRequests')
 
-        // Create a query to filter by company and status (optional: show only pending)
-        // const q = query(referralCollection, where("targetCompany", "==", company), where("status", "==", "pending"));
-        const q = query(referralCollection, where("targetCompany", "==", company)); // Fetch all for the company for now
+        // Create a query to filter by company and where paymentStatus is 'paid'
+        const q = query(referralCollectionRef, where("targetCompany", "==", company), where("paymentStatus", "==", "paid"));
 
         try {
           const querySnapshot = await getDocs(q);
@@ -113,7 +116,14 @@ const DashboardPage = () => {
           </SidebarContent>
         </Sidebar>
         <div className="flex-1 p-4 overflow-y-auto">
-          <h1 className="text-2xl font-bold mb-4 text-primary">Referrer Dashboard</h1>
+          <div className="flex justify-between items-center mb-4">
+            <h1 className="text-2xl font-bold text-primary">Referrer Dashboard</h1>
+            <Link href="/" passHref>
+              <Button variant="outline" size="icon" aria-label="Go to Homepage">
+                <HomeIcon className="h-5 w-5" />
+              </Button>
+            </Link>
+          </div>
           {company && <h2 className="text-xl mb-2 text-foreground">Company: {company}</h2>}
           {isLoading ? (
             <p className="text-foreground">Loading referral requests...</p>
@@ -123,7 +133,7 @@ const DashboardPage = () => {
                 <ReferralRequestTile
                   key={request.id}
                   request={request}
-                  onRefer={handleRefer} // Pass the handleRefer function here
+                  onRefer={handleRefer} 
                 />
               ))}
             </div>
