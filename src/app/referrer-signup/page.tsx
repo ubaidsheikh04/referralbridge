@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from 'react';
@@ -9,14 +8,13 @@ import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormItem, FormLabel, FormMessage, FormField } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
-// import { sendEmail } from "@/services/email"; // Replaced by API call
 import { useRouter } from 'next/navigation';
 
 const formSchema = z.object({
   email: z.string().email({
     message: "Invalid email address. Please use your company email.",
-  }).refine(email => !email.endsWith('@gmail.com'), {
-    message: "Please use your company email (e.g., @accenture.com, @tcs.com).",
+  }).refine(email => !email.endsWith('@gmail.com') && email.includes('@'), { // Ensure it includes '@' and is not gmail
+    message: "Please use your company email (e.g., user@company.com, not @gmail.com).",
   }),
   otp: z.string().length(6, { message: "OTP must be 6 digits." }).optional(),
   company: z.string().min(2, {
@@ -43,6 +41,7 @@ const ReferrerSignupPage = () => {
   });
 
   const sendOtpEmailApi = async (email: string, otp: string) => {
+    setIsLoading(true);
     try {
       const response = await fetch('/api/send-otp', {
         method: 'POST',
@@ -69,34 +68,38 @@ const ReferrerSignupPage = () => {
         description: error.message || "Could not send OTP email. Please try again.",
       });
       return false;
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const sendVerificationCode = async (email: string) => {
     setIsLoading(true);
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    // For testing, use a fixed OTP. In production, this would be generated securely.
+    const otp = "123456"; // Fixed OTP for testing
     setGeneratedOtp(otp);
 
-    const emailSent = await sendOtpEmailApi(email, otp);
-
-    if (emailSent) {
-      setOtpSentEmail(email);
-      setIsVerificationSent(true);
-      toast({
-        title: "Verification Code Sent!",
-        description: "Please check your email for the OTP.",
-      });
-    }
-    // For testing if email sending fails or is not configured:
-    // console.log(`Generated OTP (for testing if email fails): ${otp}`);
-    // toast({
-    //   title: "OTP Generated (Testing)",
-    //   description: `For testing, your OTP is: ${otp}. Check console if email not received.`,
-    // });
-    // setOtpSentEmail(email); // Still set to allow OTP input for testing
-    // setIsVerificationSent(true); // Still set to allow OTP input for testing
-
+    // Simulate sending email for testing by showing OTP in toast
+    console.log(`Generated OTP (for testing if email fails): ${otp}`);
+    toast({
+      title: "OTP Generated (Testing)",
+      description: `For testing, your OTP is: ${otp}. Check console if email not received.`,
+    });
+    setOtpSentEmail(email);
+    setIsVerificationSent(true);
     setIsLoading(false);
+
+    // Uncomment the following to use the actual email sending API
+    // const emailSent = await sendOtpEmailApi(email, otp);
+    // if (emailSent) {
+    //   setOtpSentEmail(email);
+    //   setIsVerificationSent(true);
+    //   toast({
+    //     title: "Verification Code Sent!",
+    //     description: "Please check your email for the OTP.",
+    //   });
+    // }
+    // setIsLoading(false);
   };
 
   const verifyOtpAndProceed = async (values: ReferrerSignupFormValues) => {
@@ -111,7 +114,7 @@ const ReferrerSignupPage = () => {
         title: "Email Verified!",
         description: "You have successfully signed up as a referrer.",
       });
-      sessionStorage.setItem('company', values.company);
+      sessionStorage.setItem('company', values.company); // Save company to session storage
       router.push('/dashboard');
     } else {
       form.setError("otp", { type: "manual", message: "Invalid OTP. Please try again." });
@@ -125,14 +128,13 @@ const ReferrerSignupPage = () => {
   };
 
   const onSubmitHandler = async (values: ReferrerSignupFormValues) => {
+    // Zod validation is handled by react-hook-form before this function is called.
+    // If this function is called, 'values' are valid according to the schema.
     if (!isVerificationSent) {
-      // Validate company field before sending OTP
-      if (!values.company || values.company.length < 2) {
-        form.setError("company", { type: "manual", message: "Company name must be at least 2 characters." });
-        return;
-      }
+      // Path for "Send OTP"
       await sendVerificationCode(values.email);
     } else {
+      // Path for "Verify OTP & Sign Up"
       await verifyOtpAndProceed(values);
     }
   };
@@ -206,4 +208,3 @@ const ReferrerSignupPage = () => {
 };
 
 export default ReferrerSignupPage;
-
