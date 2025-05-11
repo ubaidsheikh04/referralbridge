@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from 'react';
@@ -132,25 +131,41 @@ const ReferrerSignupPage = () => {
   };
 
   const handleValidationErrors = (errors: FieldErrors<ReferrerSignupFormValues>) => {
-    // This function is called by react-hook-form if validation fails.
+    // Log the raw errors object for detailed debugging
+    console.log("Raw errors object in handleValidationErrors:", JSON.stringify(errors, null, 2));
+
     if (Object.keys(errors).length > 0) {
-      console.error("Form validation failed with specific errors:", errors);
+      console.error("Form validation detected. Errors object:", errors); // Changed log message for clarity
+      let toastShown = false;
       if (errors.email?.message) {
         toast({ variant: "destructive", title: "Input Error", description: errors.email.message });
+        toastShown = true;
       } else if (errors.company?.message) {
         toast({ variant: "destructive", title: "Input Error", description: errors.company.message });
+        toastShown = true;
       } else if (errors.otp?.message && isVerificationSent) {
          toast({ variant: "destructive", title: "Input Error", description: errors.otp.message });
+         toastShown = true;
+      }
+
+      if (!toastShown) {
+        // If errors object had keys, but no specific toast was shown for email, company, or OTP,
+        // it means there's an error on a field not explicitly handled or an unexpected error structure.
+        console.error("Unhandled validation error structure. Errors:", errors);
+        toast({
+          variant: "destructive",
+          title: "Validation Error",
+          description: "Please review your input. Some fields might be invalid or an unexpected error occurred.",
+        });
       }
     } else {
-      // This case means react-hook-form called this error handler,
+      // This case: react-hook-form called the error handler,
       // but the `errors` object it provided is empty.
-      // This is unexpected and points to an issue with form state or validation logic.
-      console.log("handleValidationErrors was called by react-hook-form, but the errors object provided was empty. This indicates the form is considered invalid for a reason not tied to a specific field, or there's an issue with RHF/resolver state.");
+      console.log("handleValidationErrors was called by react-hook-form, but the errors object was empty. This often indicates an issue with form state or resolver not related to field-specific Zod errors, or the form is considered invalid by RHF for reasons other than Zod validation (e.g., native browser validation if not prevented).");
       toast({
         variant: "destructive",
-        title: "Validation Issue",
-        description: "The form has a validation issue, but no specific field errors were found. Please check your input or try again.",
+        title: "Form Submission Issue",
+        description: "Could not process the form. Please ensure all fields are correctly filled and try again.",
       });
     }
   };
