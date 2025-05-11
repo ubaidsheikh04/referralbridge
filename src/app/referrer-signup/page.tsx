@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from 'react';
@@ -38,6 +39,7 @@ const ReferrerSignupPage = () => {
       otp: "",
       company: "",
     },
+    reValidateMode: 'onChange', // Set reValidateMode
   });
 
   const sendOtpEmailApi = async (email: string, otp: string) => {
