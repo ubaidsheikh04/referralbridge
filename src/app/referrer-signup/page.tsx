@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from 'react';
@@ -14,7 +13,7 @@ import { useRouter } from 'next/navigation';
 const formSchema = z.object({
   email: z.string().email({
     message: "Invalid email address. Please use your company email.",
-  }).refine(email => !email.endsWith('@gmail.com') && email.includes('@'), { // Ensure it includes '@' and is not gmail
+  }).refine(email => !email.endsWith('@gmail.com') && email.includes('@'), {
     message: "Please use your company email (e.g., user@company.com, not @gmail.com).",
   }),
   otp: z.string().length(6, { message: "OTP must be 6 digits." }).optional(),
@@ -75,6 +74,7 @@ const ReferrerSignupPage = () => {
   };
 
   const sendVerificationCode = async (email: string) => {
+    console.log("Attempting to send verification code to:", email);
     setIsLoading(true);
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     setGeneratedOtp(otp);
@@ -93,6 +93,7 @@ const ReferrerSignupPage = () => {
   };
 
   const verifyOtpAndProceed = async (values: ReferrerSignupFormValues) => {
+    console.log("Attempting to verify OTP and proceed with values:", values);
     setIsLoading(true);
     if (!generatedOtp) {
         toast({ variant: "destructive", title: "Error", description: "OTP not generated or expired. Please request a new one." });
@@ -104,7 +105,7 @@ const ReferrerSignupPage = () => {
         title: "Email Verified!",
         description: "You have successfully signed up as a referrer.",
       });
-      sessionStorage.setItem('company', values.company); // Save company to session storage
+      sessionStorage.setItem('company', values.company);
       router.push('/dashboard');
     } else {
       form.setError("otp", { type: "manual", message: "Invalid OTP. Please try again." });
@@ -118,23 +119,37 @@ const ReferrerSignupPage = () => {
   };
 
   const onSubmitHandler = async (values: ReferrerSignupFormValues) => {
+    console.log("onSubmitHandler called with values:", values); // Crucial log
     if (!isVerificationSent) {
+      console.log("Calling sendVerificationCode");
       await sendVerificationCode(values.email);
     } else {
+      console.log("Calling verifyOtpAndProceed");
       await verifyOtpAndProceed(values);
     }
   };
 
   const handleValidationErrors = (errors: FieldErrors<ReferrerSignupFormValues>) => {
-    console.error("Form validation failed:", errors);
-    // Existing <FormMessage /> components should display these errors next to the fields.
-    // This log helps confirm that validation is the cause of inaction.
-    if (errors.email?.message) {
-      toast({ variant: "destructive", title: "Input Error", description: errors.email.message });
-    } else if (errors.company?.message) {
-      toast({ variant: "destructive", title: "Input Error", description: errors.company.message });
-    } else if (errors.otp?.message && isVerificationSent) {
-       toast({ variant: "destructive", title: "Input Error", description: errors.otp.message });
+    // This function is called by react-hook-form if validation fails.
+    if (Object.keys(errors).length > 0) {
+      console.error("Form validation failed with specific errors:", errors);
+      if (errors.email?.message) {
+        toast({ variant: "destructive", title: "Input Error", description: errors.email.message });
+      } else if (errors.company?.message) {
+        toast({ variant: "destructive", title: "Input Error", description: errors.company.message });
+      } else if (errors.otp?.message && isVerificationSent) {
+         toast({ variant: "destructive", title: "Input Error", description: errors.otp.message });
+      }
+    } else {
+      // This case means react-hook-form called this error handler,
+      // but the `errors` object it provided is empty.
+      // This is unexpected and points to an issue with form state or validation logic.
+      console.log("handleValidationErrors was called by react-hook-form, but the errors object provided was empty. This indicates the form is considered invalid for a reason not tied to a specific field, or there's an issue with RHF/resolver state.");
+      toast({
+        variant: "destructive",
+        title: "Validation Issue",
+        description: "The form has a validation issue, but no specific field errors were found. Please check your input or try again.",
+      });
     }
   };
 
