@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from 'react';
@@ -8,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormItem, FormLabel, FormMessage, FormField } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
-import { sendEmail } from "@/services/email";
+// import { sendEmail } from "@/services/email"; // Replaced by API call
 import { useRouter } from 'next/navigation';
 
 const formSchema = z.object({
@@ -41,39 +42,70 @@ const ReferrerSignupPage = () => {
     },
   });
 
+  const sendOtpEmailApi = async (email: string, otp: string) => {
+    try {
+      const response = await fetch('/api/send-otp', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          to: email,
+          subject: 'Your OTP for Referrer Signup',
+          htmlBody: `<p>Your OTP for Referrer Signup is: <strong>${otp}</strong></p>`,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to send OTP email');
+      }
+      return true;
+    } catch (error: any) {
+      console.error("Error sending OTP email via API:", error);
+      toast({
+        variant: "destructive",
+        title: "Email Error",
+        description: error.message || "Could not send OTP email. Please try again.",
+      });
+      return false;
+    }
+  };
+
   const sendVerificationCode = async (email: string) => {
     setIsLoading(true);
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     setGeneratedOtp(otp);
 
-    try {
-      // Simulate sending email
-      await sendEmail({
-        to: email,
-        subject: "Referrer Signup OTP Verification",
-        body: `Your OTP is: ${otp}`, // Actual email sending is mocked
-      });
+    const emailSent = await sendOtpEmailApi(email, otp);
 
+    if (emailSent) {
       setOtpSentEmail(email);
       setIsVerificationSent(true);
       toast({
         title: "Verification Code Sent!",
-        description: `For testing, your OTP is: ${otp}`, // Display OTP for testing
+        description: "Please check your email for the OTP.",
       });
-    } catch (error) {
-      console.error("Error sending OTP:", error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to send OTP. Please try again.",
-      });
-    } finally {
-      setIsLoading(false);
     }
+    // For testing if email sending fails or is not configured:
+    // console.log(`Generated OTP (for testing if email fails): ${otp}`);
+    // toast({
+    //   title: "OTP Generated (Testing)",
+    //   description: `For testing, your OTP is: ${otp}. Check console if email not received.`,
+    // });
+    // setOtpSentEmail(email); // Still set to allow OTP input for testing
+    // setIsVerificationSent(true); // Still set to allow OTP input for testing
+
+    setIsLoading(false);
   };
 
   const verifyOtpAndProceed = async (values: ReferrerSignupFormValues) => {
     setIsLoading(true);
+    if (!generatedOtp) {
+        toast({ variant: "destructive", title: "Error", description: "OTP not generated or expired. Please request a new one." });
+        setIsLoading(false);
+        return;
+    }
     if (values.otp === generatedOtp) {
       toast({
         title: "Email Verified!",
@@ -94,6 +126,11 @@ const ReferrerSignupPage = () => {
 
   const onSubmitHandler = async (values: ReferrerSignupFormValues) => {
     if (!isVerificationSent) {
+      // Validate company field before sending OTP
+      if (!values.company || values.company.length < 2) {
+        form.setError("company", { type: "manual", message: "Company name must be at least 2 characters." });
+        return;
+      }
       await sendVerificationCode(values.email);
     } else {
       await verifyOtpAndProceed(values);
@@ -169,3 +206,4 @@ const ReferrerSignupPage = () => {
 };
 
 export default ReferrerSignupPage;
+

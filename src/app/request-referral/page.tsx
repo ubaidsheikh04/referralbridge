@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, ChangeEvent } from 'react';
@@ -9,7 +10,7 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
 import { uploadFile } from "@/services/file-upload";
-import { sendEmail } from "@/services/email"; 
+// import { sendEmail } from "@/services/email"; // Replaced with API call
 import { addDoc, collection, getFirestore } from "firebase/firestore";
 import { firebaseApp, db } from "@/services/firebase";
 import { useRouter } from 'next/navigation';
@@ -54,6 +55,37 @@ const RequestReferralPage = () => {
     },
   });
 
+  const sendOtpEmail = async (email: string, otp: string) => {
+    try {
+      const response = await fetch('/api/send-otp', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          to: email,
+          subject: 'Your OTP for ReferralBridge',
+          htmlBody: `<p>Your OTP for ReferralBridge is: <strong>${otp}</strong></p>`,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to send OTP email');
+      }
+      return true;
+    } catch (error: any) {
+      console.error("Error sending OTP email via API:", error);
+      toast({
+        variant: "destructive",
+        title: "Email Error",
+        description: error.message || "Could not send OTP email. Please try again.",
+      });
+      return false;
+    }
+  };
+
+
   const handleSendOtp = async () => {
     setIsLoading(true);
     const email = form.getValues("email");
@@ -67,34 +99,23 @@ const RequestReferralPage = () => {
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     setGeneratedOtp(otp);
     
-    // Attempt to send email (currently logs to console)
-    try {
-        await sendEmail({ 
-          to: email,
-          subject: "Your OTP for ReferralBridge",
-          body: `Your OTP is: ${otp}`,
-        });
-        toast({
-          title: "OTP Sent!",
-          description: "Please check your email for the OTP.", // Generic message
-        });
-    } catch (error) {
-        console.error("Error attempting to send OTP email:", error);
-        toast({
-            variant: "destructive",
-            title: "Email Error",
-            description: "Could not attempt to send OTP email. Please try again.",
-        });
-        setIsLoading(false);
-        return;
-    }
+    const emailSent = await sendOtpEmail(email, otp);
 
-    setIsOtpSent(true);
-    // The following toast is removed as per user request to not show OTP in prompt
+    if (emailSent) {
+      setIsOtpSent(true);
+      toast({
+        title: "OTP Sent!",
+        description: "Please check your email for the OTP.",
+      });
+    }
+    // For testing if email sending fails or is not configured:
+    // console.log(`Generated OTP (for testing if email fails): ${otp}`);
     // toast({
-    //   title: "OTP Sent!",
-    //   description: `For testing, your OTP is: ${otp}`, 
+    //   title: "OTP Generated (Testing)",
+    //   description: `For testing, your OTP is: ${otp}. Check console if email not received.`,
     // });
+    // setIsOtpSent(true); // Still set to true to allow OTP input for testing
+
     setIsLoading(false);
   };
 
@@ -102,6 +123,12 @@ const RequestReferralPage = () => {
     setIsLoading(true);
     const otpValue = form.getValues("otp");
     const formData = form.getValues();
+    
+    if (!generatedOtp) {
+        toast({ variant: "destructive", title: "Error", description: "OTP not generated. Please request OTP first." });
+        setIsLoading(false);
+        return;
+    }
     setCurrentReferralData(formData);
 
 
@@ -159,7 +186,7 @@ const RequestReferralPage = () => {
       if (!data.orderId || !data.keyId) {
         throw new Error("Received invalid order data from server.");
       }
-      setCurrentReferralData(referralData); // Ensure referralData is set before payment
+      setCurrentReferralData(referralData); 
       handleRazorpayPayment(data.keyId, data.orderId, referralData);
 
     } catch (error: any) {
@@ -172,7 +199,7 @@ const RequestReferralPage = () => {
   };
 
   const handleRazorpayPayment = (keyId: string, orderId: string, referralDataOnPayment: ReferralFormValues) => {
-     if (!referralDataOnPayment) {
+     if (!currentReferralData) { // Check currentReferralData which is set before calling this
         console.error("Referral data is null in handlePayment at the start of Razorpay options");
         toast({ variant: "destructive", title: "Error", description: "Critical: Form data is missing. Cannot proceed with payment." });
         setIsLoading(false);
@@ -190,7 +217,7 @@ const RequestReferralPage = () => {
         setIsLoading(true); 
         setPaymentInProgress(true);
 
-        if (!currentReferralData) {
+        if (!currentReferralData) { // Double check, though it should be set
             console.error("Critical: currentReferralData is null in payment handler callback.");
             toast({ variant: "destructive", title: "Error", description: "Session data lost. Cannot save referral." });
             setIsLoading(false);
@@ -219,7 +246,7 @@ const RequestReferralPage = () => {
           toast({ title: "Payment Successful!", description: "Verifying and saving your request..." });
           
           let uploadedResumeUrl = '';
-          const resumeFiles = currentReferralData.resume; // Use currentReferralData
+          const resumeFiles = currentReferralData.resume; 
 
           if (resumeFiles instanceof FileList && resumeFiles.length === 1) {
             try {
@@ -227,12 +254,9 @@ const RequestReferralPage = () => {
             } catch (uploadError: any) {
                 console.error("Error uploading resume after payment:", uploadError);
                 toast({ variant: "destructive", title: "File Upload Error", description: `Your payment was successful, but resume upload failed: ${uploadError.message}. Please contact support.` });
-                // Decide if you still want to save the record without resume or guide user
-                // For now, we'll proceed without resume URL if upload fails post-payment
             }
           } else {
              console.warn("Resume file was not in the expected format after payment verification.");
-             // Fallback, ideally caught before payment.
           }
 
           await addDoc(collection(db, 'referralRequests'), {
@@ -240,7 +264,7 @@ const RequestReferralPage = () => {
             email: currentReferralData.email,
             targetCompany: currentReferralData.targetCompany,
             jobId: currentReferralData.jobId,
-            resumeUrl: uploadedResumeUrl, // May be empty if upload failed
+            resumeUrl: uploadedResumeUrl, 
             paymentId: response.razorpay_payment_id,
             orderId: response.razorpay_order_id,
             paymentStatus: 'paid',
@@ -259,14 +283,14 @@ const RequestReferralPage = () => {
         }
       },
       prefill: {
-        name: referralDataOnPayment.name,
-        email: referralDataOnPayment.email,
+        name: currentReferralData.name,
+        email: currentReferralData.email,
       },
       notes: {
-        name: referralDataOnPayment.name,
-        email: referralDataOnPayment.email,
-        targetCompany: referralDataOnPayment.targetCompany,
-        jobId: referralDataOnPayment.jobId,
+        name: currentReferralData.name,
+        email: currentReferralData.email,
+        targetCompany: currentReferralData.targetCompany,
+        jobId: currentReferralData.jobId,
       },
       theme: { color: "#FDB813" },
       modal: {
@@ -353,6 +377,13 @@ const RequestReferralPage = () => {
   const isButtonDisabled = () => {
     if (isLoading || paymentInProgress) return true;
     if (isOtpSent && !isEmailVerified && (!form.getValues("otp") || form.getValues("otp")?.length !== 6)) return true;
+    // Disable if any required field for payment is empty (only when about to proceed to payment)
+    if (isOtpSent && !isEmailVerified) {
+        const { name, email, targetCompany, jobId, resume } = form.getValues();
+        if (!name || !email || !targetCompany || !jobId || !resume || (resume instanceof FileList && resume.length === 0)) {
+            return true;
+        }
+    }
     return false;
   };
 
