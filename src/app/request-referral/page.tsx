@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, ChangeEvent } from 'react';
@@ -10,7 +9,6 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
 import { uploadFile } from "@/services/file-upload";
-// import { sendEmail } from "@/services/email"; // Replaced with API call
 import { addDoc, collection, getFirestore } from "firebase/firestore";
 import { firebaseApp, db } from "@/services/firebase";
 import { useRouter } from 'next/navigation';
@@ -55,7 +53,7 @@ const RequestReferralPage = () => {
     },
   });
 
-  const sendOtpEmail = async (email: string, otp: string) => {
+  const sendOtpEmailApi = async (email: string, otp: string) => {
     try {
       const response = await fetch('/api/send-otp', {
         method: 'POST',
@@ -99,7 +97,7 @@ const RequestReferralPage = () => {
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     setGeneratedOtp(otp);
     
-    const emailSent = await sendOtpEmail(email, otp);
+    const emailSent = await sendOtpEmailApi(email, otp);
 
     if (emailSent) {
       setIsOtpSent(true);
@@ -108,14 +106,6 @@ const RequestReferralPage = () => {
         description: "Please check your email for the OTP.",
       });
     }
-    // For testing if email sending fails or is not configured:
-    // console.log(`Generated OTP (for testing if email fails): ${otp}`);
-    // toast({
-    //   title: "OTP Generated (Testing)",
-    //   description: `For testing, your OTP is: ${otp}. Check console if email not received.`,
-    // });
-    // setIsOtpSent(true); // Still set to true to allow OTP input for testing
-
     setIsLoading(false);
   };
 
@@ -129,8 +119,7 @@ const RequestReferralPage = () => {
         setIsLoading(false);
         return;
     }
-    setCurrentReferralData(formData);
-
+    setCurrentReferralData(formData); // Set currentReferralData state here
 
     if (otpValue === generatedOtp) {
       setIsEmailVerified(true);
@@ -186,7 +175,8 @@ const RequestReferralPage = () => {
       if (!data.orderId || !data.keyId) {
         throw new Error("Received invalid order data from server.");
       }
-      setCurrentReferralData(referralData); 
+      // setCurrentReferralData is already called in handleVerifyOtpAndProceedToPayment
+      // No need to call it again here if referralData is formData passed down
       handleRazorpayPayment(data.keyId, data.orderId, referralData);
 
     } catch (error: any) {
@@ -199,8 +189,8 @@ const RequestReferralPage = () => {
   };
 
   const handleRazorpayPayment = (keyId: string, orderId: string, referralDataOnPayment: ReferralFormValues) => {
-     if (!currentReferralData) { // Check currentReferralData which is set before calling this
-        console.error("Referral data is null in handlePayment at the start of Razorpay options");
+     if (!referralDataOnPayment) { 
+        console.error("Referral data (referralDataOnPayment parameter) is null in handlePayment at the start of Razorpay options");
         toast({ variant: "destructive", title: "Error", description: "Critical: Form data is missing. Cannot proceed with payment." });
         setIsLoading(false);
         setPaymentInProgress(false);
@@ -217,8 +207,8 @@ const RequestReferralPage = () => {
         setIsLoading(true); 
         setPaymentInProgress(true);
 
-        if (!currentReferralData) { // Double check, though it should be set
-            console.error("Critical: currentReferralData is null in payment handler callback.");
+        if (!referralDataOnPayment) { 
+            console.error("Critical: referralDataOnPayment is null in payment handler callback.");
             toast({ variant: "destructive", title: "Error", description: "Session data lost. Cannot save referral." });
             setIsLoading(false);
             setPaymentInProgress(false);
@@ -246,7 +236,7 @@ const RequestReferralPage = () => {
           toast({ title: "Payment Successful!", description: "Verifying and saving your request..." });
           
           let uploadedResumeUrl = '';
-          const resumeFiles = currentReferralData.resume; 
+          const resumeFiles = referralDataOnPayment.resume; 
 
           if (resumeFiles instanceof FileList && resumeFiles.length === 1) {
             try {
@@ -254,20 +244,21 @@ const RequestReferralPage = () => {
             } catch (uploadError: any) {
                 console.error("Error uploading resume after payment:", uploadError);
                 toast({ variant: "destructive", title: "File Upload Error", description: `Your payment was successful, but resume upload failed: ${uploadError.message}. Please contact support.` });
+                // Decide if you still want to proceed or not. For now, we save without resume if upload fails.
             }
           } else {
              console.warn("Resume file was not in the expected format after payment verification.");
           }
 
           await addDoc(collection(db, 'referralRequests'), {
-            name: currentReferralData.name,
-            email: currentReferralData.email,
-            targetCompany: currentReferralData.targetCompany,
-            jobId: currentReferralData.jobId,
+            name: referralDataOnPayment.name,
+            email: referralDataOnPayment.email,
+            targetCompany: referralDataOnPayment.targetCompany,
+            jobId: referralDataOnPayment.jobId,
             resumeUrl: uploadedResumeUrl, 
             paymentId: response.razorpay_payment_id,
             orderId: response.razorpay_order_id,
-            paymentStatus: 'paid',
+            paymentStatus: 'paid', // Mark as paid
             timestamp: new Date(),
           });
 
@@ -283,22 +274,22 @@ const RequestReferralPage = () => {
         }
       },
       prefill: {
-        name: currentReferralData.name,
-        email: currentReferralData.email,
+        name: referralDataOnPayment.name,
+        email: referralDataOnPayment.email,
       },
       notes: {
-        name: currentReferralData.name,
-        email: currentReferralData.email,
-        targetCompany: currentReferralData.targetCompany,
-        jobId: currentReferralData.jobId,
+        name: referralDataOnPayment.name,
+        email: referralDataOnPayment.email,
+        targetCompany: referralDataOnPayment.targetCompany,
+        jobId: referralDataOnPayment.jobId,
       },
-      theme: { color: "#FDB813" },
+      theme: { color: "#FDB813" }, // Consider using your theme's primary color
       modal: {
         ondismiss: function() {
           toast({ variant: "default", title: "Payment Cancelled", description: "Your payment was not completed." });
           setIsLoading(false);
           setPaymentInProgress(false);
-          setIsEmailVerified(false); 
+          setIsEmailVerified(false); // Reset email verification status
         }
       }
     };
