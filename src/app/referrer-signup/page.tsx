@@ -17,19 +17,22 @@ const formSchema = z.object({
   }).refine(email => !email.endsWith('@gmail.com'), {
     message: "Please use your company email (e.g., @accenture.com, @tcs.com).",
   }),
-  otp: z.string().optional(),
+  otp: z.string().length(6, { message: "OTP must be 6 digits." }).optional(),
   company: z.string().min(2, {
     message: "Company name must be at least 2 characters.",
   }),
 });
 
+type ReferrerSignupFormValues = z.infer<typeof formSchema>;
+
 const ReferrerSignupPage = () => {
   const [isVerificationSent, setIsVerificationSent] = useState(false);
   const [otpSentEmail, setOtpSentEmail] = useState('');
+  const [generatedOtp, setGeneratedOtp] = useState<string | null>(null);
   const router = useRouter();
-  const [otp, setOtp] = useState("123456");
+  const [isLoading, setIsLoading] = useState(false);
 
-  const form = useForm<z.infer<typeof formSchema>>({
+  const form = useForm<ReferrerSignupFormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       email: "",
@@ -39,21 +42,23 @@ const ReferrerSignupPage = () => {
   });
 
   const sendVerificationCode = async (email: string) => {
-    // const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
-    // setOtp(generatedOtp); // Store generated OTP
+    setIsLoading(true);
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    setGeneratedOtp(otp);
 
     try {
+      // Simulate sending email
       await sendEmail({
         to: email,
         subject: "Referrer Signup OTP Verification",
-        body: `Your OTP is: ${otp}`,
+        body: `Your OTP is: ${otp}`, // Actual email sending is mocked
       });
 
-      setOtpSentEmail(email); // Store the email the OTP was sent to
+      setOtpSentEmail(email);
       setIsVerificationSent(true);
       toast({
-        title: "Verification Email Sent!",
-        description: `Please use ${otp} as OTP`,
+        title: "Verification Code Sent!",
+        description: `For testing, your OTP is: ${otp}`, // Display OTP for testing
       });
     } catch (error) {
       console.error("Error sending OTP:", error);
@@ -62,44 +67,44 @@ const ReferrerSignupPage = () => {
         title: "Error",
         description: "Failed to send OTP. Please try again.",
       });
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const verifyOtp = async (values: z.infer<typeof formSchema>) => {
-    if (values.otp === otp) { // Correctly comparing with the string '123456'
-      // OTP is valid, proceed with signup
+  const verifyOtpAndProceed = async (values: ReferrerSignupFormValues) => {
+    setIsLoading(true);
+    if (values.otp === generatedOtp) {
       toast({
         title: "Email Verified!",
         description: "You have successfully signed up as a referrer.",
       });
       sessionStorage.setItem('company', values.company);
-      router.push('/dashboard'); // Navigate to the dashboard
+      router.push('/dashboard');
     } else {
-      // OTP is invalid
+      form.setError("otp", { type: "manual", message: "Invalid OTP. Please try again." });
       toast({
         variant: "destructive",
         title: "Error",
         description: "Invalid OTP. Please try again.",
       });
     }
+    setIsLoading(false);
   };
 
-  const onSubmit = async (values: z.infer<typeof formSchema>) => {
+  const onSubmitHandler = async (values: ReferrerSignupFormValues) => {
     if (!isVerificationSent) {
-      // Send OTP
       await sendVerificationCode(values.email);
-      setIsVerificationSent(true);
     } else {
-      // Verify OTP
-      await verifyOtp(values);
+      await verifyOtpAndProceed(values);
     }
   };
 
   return (
     <div className="container mx-auto py-10">
-      <h1 className="text-2xl font-bold mb-4">Referrer Signup</h1>
+      <h1 className="text-2xl font-bold mb-4 text-primary">Referrer Signup</h1>
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <form onSubmit={form.handleSubmit(onSubmitHandler)} className="space-y-4">
           <FormField
             control={form.control}
             name="email"
@@ -110,7 +115,7 @@ const ReferrerSignupPage = () => {
                   <Input
                     placeholder="Enter your company email"
                     {...field}
-                    disabled={isVerificationSent}
+                    disabled={isVerificationSent || isLoading}
                   />
                 </FormControl>
                 <FormMessage />
@@ -127,7 +132,7 @@ const ReferrerSignupPage = () => {
                     <Input
                       placeholder="Enter your company name"
                       {...field}
-                      disabled={isVerificationSent}
+                      disabled={isVerificationSent || isLoading}
                     />
                   </FormControl>
                   <FormMessage />
@@ -140,11 +145,13 @@ const ReferrerSignupPage = () => {
               name="otp"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>OTP</FormLabel>
+                  <FormLabel>OTP (6 digits)</FormLabel>
                   <FormControl>
                     <Input
-                      placeholder="Enter OTP sent to your email"
+                      placeholder="Enter OTP"
                       {...field}
+                      maxLength={6}
+                      disabled={isLoading}
                     />
                   </FormControl>
                   <FormMessage />
@@ -152,8 +159,8 @@ const ReferrerSignupPage = () => {
               )}
             />
           )}
-          <Button type="submit" disabled={isVerificationSent && !form.getValues("otp")}>
-            {isVerificationSent ? "Verify OTP" : "Sign Up"}
+          <Button type="submit" disabled={isLoading || (isVerificationSent && !form.getValues("otp"))}>
+            {isLoading ? "Processing..." : (isVerificationSent ? "Verify OTP & Sign Up" : "Send OTP")}
           </Button>
         </form>
       </Form>
