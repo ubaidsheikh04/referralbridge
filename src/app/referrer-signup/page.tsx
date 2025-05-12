@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from 'react';
@@ -135,7 +136,7 @@ const ReferrerSignupPage = () => {
     console.log("Raw errors object in handleValidationErrors:", JSON.stringify(errors, null, 2));
 
     if (Object.keys(errors).length > 0) {
-      console.error("Form validation detected. Errors object:", errors); // Changed log message for clarity
+      console.error("Form validation detected. Errors object:", JSON.stringify(errors, null, 2)); // Use JSON.stringify
       let toastShown = false;
       if (errors.email?.message) {
         toast({ variant: "destructive", title: "Input Error", description: errors.email.message });
@@ -151,7 +152,7 @@ const ReferrerSignupPage = () => {
       if (!toastShown) {
         // If errors object had keys, but no specific toast was shown for email, company, or OTP,
         // it means there's an error on a field not explicitly handled or an unexpected error structure.
-        console.error("Unhandled validation error structure. Errors:", errors);
+        console.error("Unhandled validation error structure. Errors:", JSON.stringify(errors, null, 2)); // Use JSON.stringify
         toast({
           variant: "destructive",
           title: "Validation Error",
