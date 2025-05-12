@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from 'react';
@@ -17,7 +16,11 @@ const formSchema = z.object({
   }).refine(email => !email.endsWith('@gmail.com') && email.includes('@'), {
     message: "Please use your company email (e.g., user@company.com, not @gmail.com).",
   }),
-  otp: z.string().length(6, { message: "OTP must be 6 digits." }).optional(),
+  // Allow OTP to be a 6-digit string OR an empty string. The .optional() means it can also be undefined.
+  otp: z.union([
+    z.string().length(6, { message: "OTP must be 6 digits." }),
+    z.literal("") // Allows empty string
+  ]).optional(),
   company: z.string().min(2, {
     message: "Company name must be at least 2 characters.",
   }),
@@ -36,10 +39,10 @@ const ReferrerSignupPage = () => {
     resolver: zodResolver(formSchema),
     defaultValues: {
       email: "",
-      otp: "",
+      otp: "", // Default to empty string, which is now valid by the schema initially
       company: "",
     },
-    reValidateMode: 'onChange', // Set reValidateMode
+    reValidateMode: 'onChange',
   });
 
   const sendOtpEmailApi = async (email: string, otp: string) => {
@@ -91,17 +94,31 @@ const ReferrerSignupPage = () => {
         description: "Please check your email for the OTP.",
       });
     }
-    setIsLoading(false);
+    // setIsLoading(false); // Handled by sendOtpEmailApi's finally block
   };
 
   const verifyOtpAndProceed = async (values: ReferrerSignupFormValues) => {
     console.log("Attempting to verify OTP and proceed with values:", values);
     setIsLoading(true);
+
     if (!generatedOtp) {
         toast({ variant: "destructive", title: "Error", description: "OTP not generated or expired. Please request a new one." });
         setIsLoading(false);
         return;
     }
+
+    // Explicitly check if OTP is provided and is 6 digits when verification is attempted
+    if (!values.otp || values.otp.length !== 6) {
+        form.setError("otp", { type: "manual", message: "OTP must be 6 digits." });
+        toast({
+            variant: "destructive",
+            title: "Error",
+            description: "OTP must be 6 digits.",
+        });
+        setIsLoading(false);
+        return;
+    }
+
     if (values.otp === generatedOtp) {
       toast({
         title: "Email Verified!",
@@ -109,6 +126,7 @@ const ReferrerSignupPage = () => {
       });
       sessionStorage.setItem('company', values.company);
       router.push('/dashboard');
+      // setIsLoading(false); // Navigation will unmount, or can be set if navigation fails
     } else {
       form.setError("otp", { type: "manual", message: "Invalid OTP. Please try again." });
       toast({
@@ -116,25 +134,25 @@ const ReferrerSignupPage = () => {
         title: "Error",
         description: "Invalid OTP. Please try again.",
       });
+      setIsLoading(false);
     }
-    setIsLoading(false);
   };
 
   const onSubmitHandler = async (values: ReferrerSignupFormValues) => {
-    console.log("onSubmitHandler called with values:", values); // Crucial log
+    console.log("onSubmitHandler called with values:", values);
     if (!isVerificationSent) {
-      console.log("Calling sendVerificationCode");
+      console.log("Calling sendVerificationCode for email:", values.email);
+      // Fields 'email' and 'company' would have been validated by Zod by this point.
+      // If they were invalid, handleValidationErrors would have been called.
       await sendVerificationCode(values.email);
     } else {
-      console.log("Calling verifyOtpAndProceed");
+      console.log("Calling verifyOtpAndProceed with values:", values);
       await verifyOtpAndProceed(values);
     }
   };
 
-  const handleValidationErrors = (errors: FieldErrors<ReferrerSignupFormValues>) => {
-    // Log the raw errors object for detailed debugging
-    console.log("Raw errors object in handleValidationErrors:", JSON.stringify(errors, null, 2));
-
+ const handleValidationErrors = (errors: FieldErrors<ReferrerSignupFormValues>) => {
+    // This function is called by react-hook-form if validation fails.
     if (Object.keys(errors).length > 0) {
       console.error("Form validation detected. Errors object:", JSON.stringify(errors, null, 2)); // Use JSON.stringify
       let toastShown = false;
@@ -144,25 +162,27 @@ const ReferrerSignupPage = () => {
       } else if (errors.company?.message) {
         toast({ variant: "destructive", title: "Input Error", description: errors.company.message });
         toastShown = true;
-      } else if (errors.otp?.message && isVerificationSent) {
+      } else if (errors.otp?.message && isVerificationSent) { // Only show OTP error if we are in OTP verification stage
          toast({ variant: "destructive", title: "Input Error", description: errors.otp.message });
          toastShown = true;
       }
 
-      if (!toastShown) {
-        // If errors object had keys, but no specific toast was shown for email, company, or OTP,
-        // it means there's an error on a field not explicitly handled or an unexpected error structure.
-        console.error("Unhandled validation error structure. Errors:", JSON.stringify(errors, null, 2)); // Use JSON.stringify
-        toast({
-          variant: "destructive",
-          title: "Validation Error",
-          description: "Please review your input. Some fields might be invalid or an unexpected error occurred.",
-        });
+      if (!toastShown && Object.keys(errors).length > 0) {
+        // If errors object had keys, but no specific toast was shown (e.g. OTP error when !isVerificationSent)
+        // Log it for debugging but don't necessarily show a generic toast, as specific field errors are preferred.
+        console.warn("Unhandled Zod validation error scenario or OTP error when not in verification stage. Errors:", JSON.stringify(errors, null, 2));
+        // Optionally, you could show a generic error if certain unhandled Zod errors appear
+        // toast({
+        //   variant: "destructive",
+        //   title: "Validation Error",
+        //   description: "Please review your input.",
+        // });
       }
     } else {
       // This case: react-hook-form called the error handler,
       // but the `errors` object it provided is empty.
-      console.log("handleValidationErrors was called by react-hook-form, but the errors object was empty. This often indicates an issue with form state or resolver not related to field-specific Zod errors, or the form is considered invalid by RHF for reasons other than Zod validation (e.g., native browser validation if not prevented).");
+      // This can happen if the form is marked invalid for reasons outside Zod schema (e.g. native constraints, server errors set by setError)
+      console.log("handleValidationErrors was called by react-hook-form, but the errors object was empty. This may indicate an issue not related to Zod field validation (e.g., native browser validation if not prevented, or a manually set form-level error).");
       toast({
         variant: "destructive",
         title: "Form Submission Issue",
@@ -170,6 +190,7 @@ const ReferrerSignupPage = () => {
       });
     }
   };
+
 
   return (
     <div className="container mx-auto py-10">
