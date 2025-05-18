@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, ChangeEvent } from 'react';
@@ -10,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
 import { uploadFile } from "@/services/file-upload";
 import { addDoc, collection, getFirestore } from "firebase/firestore";
-import { firebaseApp, db } from "@/services/firebase";
+import { firebaseApp, db } from "@/services/firebase"; // db is already exported from firebase
 import { useRouter } from 'next/navigation';
 import Script from 'next/script';
 
@@ -54,6 +55,7 @@ const RequestReferralPage = () => {
   });
 
   const sendOtpEmailApi = async (email: string, otp: string) => {
+    setIsLoading(true);
     try {
       const response = await fetch('/api/send-otp', {
         method: 'POST',
@@ -80,6 +82,8 @@ const RequestReferralPage = () => {
         description: error.message || "Could not send OTP email. Please try again.",
       });
       return false;
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -112,7 +116,7 @@ const RequestReferralPage = () => {
   const handleVerifyOtpAndProceedToPayment = async () => {
     setIsLoading(true);
     const otpValue = form.getValues("otp");
-    const formData = form.getValues();
+    const formData = form.getValues(); // Get current form values
     
     if (!generatedOtp) {
         toast({ variant: "destructive", title: "Error", description: "OTP not generated. Please request OTP first." });
@@ -127,7 +131,7 @@ const RequestReferralPage = () => {
         title: "Email Verified!",
         description: "Proceeding to payment...",
       });
-      await createRazorpayOrder(formData);
+      await createRazorpayOrder(formData); // Pass formData to createRazorpayOrder
     } else {
       form.setError("otp", { type: "manual", message: "Invalid OTP." });
       toast({
@@ -167,7 +171,12 @@ const RequestReferralPage = () => {
       if (!response.ok) {
         const errorText = await response.text();
         console.error("Error creating Razorpay order. Server response:", errorText);
-        const errorData = JSON.parse(errorText || "{}");
+        let errorData = { error: `Failed to create Razorpay order. Status: ${response.status}` };
+        try {
+            errorData = JSON.parse(errorText || "{}");
+        } catch (parseError) {
+            console.warn("Could not parse error response from create-order as JSON", parseError);
+        }
         throw new Error(errorData.error || `Failed to create Razorpay order. Status: ${response.status}`);
       }
 
@@ -175,8 +184,8 @@ const RequestReferralPage = () => {
       if (!data.orderId || !data.keyId) {
         throw new Error("Received invalid order data from server.");
       }
-      // setCurrentReferralData is already called in handleVerifyOtpAndProceedToPayment
-      // No need to call it again here if referralData is formData passed down
+      // currentReferralData should already be set from handleVerifyOtpAndProceedToPayment
+      // Pass referralData (which is formData) directly to handleRazorpayPayment
       handleRazorpayPayment(data.keyId, data.orderId, referralData);
 
     } catch (error: any) {
@@ -229,7 +238,12 @@ const RequestReferralPage = () => {
           if (!verificationResponse.ok) {
              const errorText = await verificationResponse.text();
              console.error("Payment verification failed. Server response:", errorText);
-             const errorData = JSON.parse(errorText || "{}");
+             let errorData = { error: `Payment verification failed. Status: ${verificationResponse.status}`};
+             try {
+                errorData = JSON.parse(errorText || "{}");
+             } catch(parseError) {
+                console.warn("Could not parse error response from verify-payment as JSON", parseError);
+             }
              throw new Error(errorData.error || `Payment verification failed. Status: ${verificationResponse.status}`);
           }
           
@@ -244,7 +258,6 @@ const RequestReferralPage = () => {
             } catch (uploadError: any) {
                 console.error("Error uploading resume after payment:", uploadError);
                 toast({ variant: "destructive", title: "File Upload Error", description: `Your payment was successful, but resume upload failed: ${uploadError.message}. Please contact support.` });
-                // Decide if you still want to proceed or not. For now, we save without resume if upload fails.
             }
           } else {
              console.warn("Resume file was not in the expected format after payment verification.");
@@ -258,12 +271,14 @@ const RequestReferralPage = () => {
             resumeUrl: uploadedResumeUrl, 
             paymentId: response.razorpay_payment_id,
             orderId: response.razorpay_order_id,
-            paymentStatus: 'paid', // Mark as paid
+            paymentStatus: 'paid', 
+            status: 'pending', // Default status for new requests
             timestamp: new Date(),
           });
 
           toast({ title: "Referral Submitted!", description: "Your referral request has been successfully submitted." });
-          router.push('/thank-you');
+          sessionStorage.setItem('candidateViewEmail', referralDataOnPayment.email); // Store candidate email
+          router.push('/dashboard'); // Redirect to dashboard to see "My Requests"
 
         } catch (error: any) {
           console.error("Error processing payment or saving data:", error);
@@ -283,13 +298,13 @@ const RequestReferralPage = () => {
         targetCompany: referralDataOnPayment.targetCompany,
         jobId: referralDataOnPayment.jobId,
       },
-      theme: { color: "#FDB813" }, // Consider using your theme's primary color
+      theme: { color: "#FDB813" },
       modal: {
         ondismiss: function() {
           toast({ variant: "default", title: "Payment Cancelled", description: "Your payment was not completed." });
           setIsLoading(false);
           setPaymentInProgress(false);
-          setIsEmailVerified(false); // Reset email verification status
+          setIsEmailVerified(false); 
         }
       }
     };
@@ -368,7 +383,6 @@ const RequestReferralPage = () => {
   const isButtonDisabled = () => {
     if (isLoading || paymentInProgress) return true;
     if (isOtpSent && !isEmailVerified && (!form.getValues("otp") || form.getValues("otp")?.length !== 6)) return true;
-    // Disable if any required field for payment is empty (only when about to proceed to payment)
     if (isOtpSent && !isEmailVerified) {
         const { name, email, targetCompany, jobId, resume } = form.getValues();
         if (!name || !email || !targetCompany || !jobId || !resume || (resume instanceof FileList && resume.length === 0)) {
@@ -504,3 +518,5 @@ const RequestReferralPage = () => {
 };
 
 export default RequestReferralPage;
+
+    
