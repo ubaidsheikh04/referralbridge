@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from 'react';
@@ -125,8 +126,8 @@ const ReferrerSignupPage = () => {
         description: "You have successfully signed up as a referrer.",
       });
       sessionStorage.setItem('company', values.company);
+      sessionStorage.setItem('referrerEmail', values.email); // Store referrer's email
       router.push('/dashboard');
-      // setIsLoading(false); // Navigation will unmount, or can be set if navigation fails
     } else {
       form.setError("otp", { type: "manual", message: "Invalid OTP. Please try again." });
       toast({
@@ -142,8 +143,6 @@ const ReferrerSignupPage = () => {
     console.log("onSubmitHandler called with values:", values);
     if (!isVerificationSent) {
       console.log("Calling sendVerificationCode for email:", values.email);
-      // Fields 'email' and 'company' would have been validated by Zod by this point.
-      // If they were invalid, handleValidationErrors would have been called.
       await sendVerificationCode(values.email);
     } else {
       console.log("Calling verifyOtpAndProceed with values:", values);
@@ -152,9 +151,8 @@ const ReferrerSignupPage = () => {
   };
 
  const handleValidationErrors = (errors: FieldErrors<ReferrerSignupFormValues>) => {
-    // This function is called by react-hook-form if validation fails.
     if (Object.keys(errors).length > 0) {
-      console.error("Form validation detected. Errors object:", JSON.stringify(errors, null, 2)); // Use JSON.stringify
+      console.error("Form validation detected. Errors object:", JSON.stringify(errors, null, 2)); 
       let toastShown = false;
       if (errors.email?.message) {
         toast({ variant: "destructive", title: "Input Error", description: errors.email.message });
@@ -162,27 +160,16 @@ const ReferrerSignupPage = () => {
       } else if (errors.company?.message) {
         toast({ variant: "destructive", title: "Input Error", description: errors.company.message });
         toastShown = true;
-      } else if (errors.otp?.message && isVerificationSent) { // Only show OTP error if we are in OTP verification stage
+      } else if (errors.otp?.message && isVerificationSent) { 
          toast({ variant: "destructive", title: "Input Error", description: errors.otp.message });
          toastShown = true;
       }
 
       if (!toastShown && Object.keys(errors).length > 0) {
-        // If errors object had keys, but no specific toast was shown (e.g. OTP error when !isVerificationSent)
-        // Log it for debugging but don't necessarily show a generic toast, as specific field errors are preferred.
         console.warn("Unhandled Zod validation error scenario or OTP error when not in verification stage. Errors:", JSON.stringify(errors, null, 2));
-        // Optionally, you could show a generic error if certain unhandled Zod errors appear
-        // toast({
-        //   variant: "destructive",
-        //   title: "Validation Error",
-        //   description: "Please review your input.",
-        // });
       }
     } else {
-      // This case: react-hook-form called the error handler,
-      // but the `errors` object it provided is empty.
-      // This can happen if the form is marked invalid for reasons outside Zod schema (e.g. native constraints, server errors set by setError)
-      console.log("handleValidationErrors was called by react-hook-form, but the errors object was empty. This may indicate an issue not related to Zod field validation (e.g., native browser validation if not prevented, or a manually set form-level error).");
+      console.log("handleValidationErrors was called by react-hook-form, but the errors object was empty. This may indicate an issue not related to Zod field validation.");
       toast({
         variant: "destructive",
         title: "Form Submission Issue",
@@ -251,7 +238,7 @@ const ReferrerSignupPage = () => {
               )}
             />
           )}
-          <Button type="submit" disabled={isLoading || (isVerificationSent && !form.getValues("otp"))}>
+          <Button type="submit" disabled={isLoading || (isVerificationSent && (!form.getValues("otp") || form.getValues("otp")?.length !== 6))}>
             {isLoading ? "Processing..." : (isVerificationSent ? "Verify OTP & Sign Up" : "Send OTP")}
           </Button>
         </form>
