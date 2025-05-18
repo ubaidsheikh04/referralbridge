@@ -9,7 +9,7 @@ import ReferralRequestTile from "@/components/ReferralRequestTile";
 import { toast } from "@/hooks/use-toast";
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { HomeIcon } from 'lucide-react';
+import { HomeIcon, Briefcase } from 'lucide-react'; // Added Briefcase
 
 interface ReferralRequestData {
   id: string;
@@ -22,50 +22,34 @@ interface ReferralRequestData {
   paymentStatus?: string;
 }
 
-type ActiveView = 'companyReferrals' | 'mySubmitted';
-
 const DashboardPage = () => {
   const [companyReferrals, setCompanyReferrals] = useState<ReferralRequestData[]>([]);
-  const [mySubmittedRequests, setMySubmittedRequests] = useState<ReferralRequestData[]>([]);
   const [company, setCompany] = useState(''); // For referrer's company
-  const [loggedInUserEmail, setLoggedInUserEmail] = useState(''); // For fetching "My Submitted Requests" or if referrer is also a candidate
+  const [referrerEmail, setReferrerEmail] = useState(''); // Store referrer's email
   const [isLoadingCompanyReferrals, setIsLoadingCompanyReferrals] = useState(true);
-  const [isLoadingMyRequests, setIsLoadingMyRequests] = useState(true);
-  const [activeView, setActiveView] = useState<ActiveView>('companyReferrals');
 
   useEffect(() => {
     const storedCompany = sessionStorage.getItem('company');
     const storedReferrerEmail = sessionStorage.getItem('referrerEmail');
-    const storedCandidateViewEmail = sessionStorage.getItem('candidateViewEmail');
 
     if (storedCompany) {
       setCompany(storedCompany);
     }
-
-    let userEmailForDashboard = '';
     if (storedReferrerEmail) {
-      userEmailForDashboard = storedReferrerEmail;
-      setActiveView('companyReferrals'); // Default for referrers
-    } else if (storedCandidateViewEmail) {
-      userEmailForDashboard = storedCandidateViewEmail;
-      setActiveView('mySubmitted'); // Default for candidates who just submitted
+      setReferrerEmail(storedReferrerEmail);
     }
-    setLoggedInUserEmail(userEmailForDashboard);
 
-
-    if (!userEmailForDashboard && !storedCompany) {
+    if (!storedCompany || !storedReferrerEmail) {
         setIsLoadingCompanyReferrals(false);
-        setIsLoadingMyRequests(false);
     }
   }, []);
 
   // Fetch company referrals (for logged-in referrer)
   useEffect(() => {
-    if (company && loggedInUserEmail) { // Ensure user is a referrer
+    if (company && referrerEmail) { // Ensure user is a referrer
       const fetchCompanyReferrals = async () => {
         setIsLoadingCompanyReferrals(true);
         const referralCollectionRef = collection(db, 'referralRequests');
-        // Only fetch for the specific company if the user is a referrer
         const q = query(referralCollectionRef, where("targetCompany", "==", company), where("paymentStatus", "==", "paid"));
         try {
           const querySnapshot = await getDocs(q);
@@ -85,38 +69,9 @@ const DashboardPage = () => {
       fetchCompanyReferrals();
     } else {
         setCompanyReferrals([]);
-        setIsLoadingCompanyReferrals(false);
+        setIsLoadingCompanyReferrals(false); // Set loading to false if no company/email
     }
-  }, [company, loggedInUserEmail]); // Depend on loggedInUserEmail as well to ensure it's a referrer
-
-  // Fetch my submitted requests (for any logged-in user: referrer or candidate)
-  useEffect(() => {
-    if (loggedInUserEmail) { // This email can be from referrer login or candidate submission
-      const fetchMySubmittedRequests = async () => {
-        setIsLoadingMyRequests(true);
-        const referralCollectionRef = collection(db, 'referralRequests');
-        const q = query(referralCollectionRef, where("email", "==", loggedInUserEmail), where("paymentStatus", "==", "paid"));
-        try {
-          const querySnapshot = await getDocs(q);
-          const requests = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ReferralRequestData));
-          setMySubmittedRequests(requests);
-        } catch (error) {
-          console.error("Error fetching my submitted requests:", error);
-          toast({
-            variant: "destructive",
-            title: "Error",
-            description: "Failed to fetch your submitted requests.",
-          });
-        } finally {
-          setIsLoadingMyRequests(false);
-        }
-      };
-      fetchMySubmittedRequests();
-    } else {
-        setMySubmittedRequests([]);
-        setIsLoadingMyRequests(false);
-    }
-  }, [loggedInUserEmail]);
+  }, [company, referrerEmail]);
 
   const handleRefer = async (requestId: string) => {
     const requestRef = doc(db, 'referralRequests', requestId);
@@ -125,12 +80,6 @@ const DashboardPage = () => {
       setCompanyReferrals(prevRequests =>
         prevRequests.map(req =>
           req.id === requestId ? { ...req, status: 'referred' } : req
-        )
-      );
-      // Also update in mySubmittedRequests if the referrer is viewing their own request they referred
-      setMySubmittedRequests(prevRequests =>
-        prevRequests.map(req =>
-            req.id === requestId ? { ...req, status: 'referred' } : req
         )
       );
       toast({
@@ -148,47 +97,29 @@ const DashboardPage = () => {
   };
 
   const renderContent = () => {
-    if (activeView === 'companyReferrals') {
-      if (isLoadingCompanyReferrals) return <p className="text-foreground">Loading company referrals...</p>;
-      if (!company) return <p className="text-foreground">Sign up as a referrer with a company to view company referrals.</p>; // Check company specifically
-      if (companyReferrals.length === 0) return <p className="text-foreground">No referral requests available for {company}.</p>;
-      return (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {companyReferrals.map((request) => (
-            <ReferralRequestTile
-              key={request.id}
-              request={request}
-              onRefer={handleRefer}
-              viewMode="referrer"
-            />
-          ))}
-        </div>
-      );
-    } else { // activeView === 'mySubmitted'
-      if (isLoadingMyRequests) return <p className="text-foreground">Loading your submitted requests...</p>;
-      if (!loggedInUserEmail) return <p className="text-foreground">Log in or submit a request to view your submitted requests.</p>;
-      if (mySubmittedRequests.length === 0) return <p className="text-foreground">You have not submitted any referral requests.</p>;
-      return (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {mySubmittedRequests.map((request) => (
-            <ReferralRequestTile
-              key={request.id}
-              request={request}
-              viewMode="candidate" // onRefer is not needed for candidate view
-            />
-          ))}
-        </div>
-      );
-    }
+    if (isLoadingCompanyReferrals) return <p className="text-foreground">Loading company referrals...</p>;
+    if (!referrerEmail) return <p className="text-foreground">Please sign up or log in as a referrer to view company referrals.</p>;
+    if (!company && referrerEmail) return <p className="text-foreground">Company information not found. Please ensure you signed up with a company.</p>;
+    if (companyReferrals.length === 0) return <p className="text-foreground">No referral requests currently available for {company}.</p>;
+    
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {companyReferrals.map((request) => (
+          <ReferralRequestTile
+            key={request.id}
+            request={request}
+            onRefer={handleRefer}
+            viewMode="referrer"
+          />
+        ))}
+      </div>
+    );
   };
   
   const getPageTitle = () => {
-    if (activeView === 'companyReferrals') {
-        return company ? `Referral Requests for ${company}` : "Company Referrals (Please sign up as referrer)";
-    }
-    return "My Submitted Requests";
+    if (!referrerEmail) return "Referrer Dashboard";
+    return company ? `Referral Requests for ${company}` : "Company Referrals (Company not specified)";
   }
-
 
   return (
     <SidebarProvider>
@@ -200,20 +131,10 @@ const DashboardPage = () => {
               <SidebarMenu>
                 <SidebarMenuItem>
                   <SidebarMenuButton 
-                    onClick={() => setActiveView('companyReferrals')} 
-                    className={activeView === 'companyReferrals' ? 'bg-sidebar-accent text-sidebar-accent-foreground' : ''}
-                    disabled={!sessionStorage.getItem('referrerEmail')} // Disable if not logged in as referrer
+                    className={'bg-sidebar-accent text-sidebar-accent-foreground'} // Always active
+                    disabled={!referrerEmail} 
                   >
-                    Company Referrals
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton 
-                    onClick={() => setActiveView('mySubmitted')}
-                    className={activeView === 'mySubmitted' ? 'bg-sidebar-accent text-sidebar-accent-foreground' : ''}
-                    disabled={!loggedInUserEmail} // Disable if no user email is available
-                  >
-                    My Submitted Requests
+                    <Briefcase className="mr-2 h-4 w-4" /> Company Referrals
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               </SidebarMenu>
@@ -236,5 +157,3 @@ const DashboardPage = () => {
   );
 };
 export default DashboardPage;
-
-    
