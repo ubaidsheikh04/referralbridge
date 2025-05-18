@@ -10,7 +10,7 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
 import { uploadFile } from "@/services/file-upload";
-import { addDoc, collection } from "firebase/firestore";
+import { addDoc, collection, getDocs, query, where, getFirestore } from "firebase/firestore";
 import { firebaseApp, db } from "@/services/firebase";
 import { useRouter } from 'next/navigation';
 import Script from 'next/script';
@@ -69,14 +69,18 @@ const RequestReferralPage = () => {
     },
   });
 
-  const sendOtpEmailApi = async (email: string, otp: string) => {
+  const sendOtpEmailApi = async (email: string, otp: string, subject?: string, htmlBody?: string) => {
     // This function now only handles the API call and error toasting for that call.
     // isLoading state for the overall user action is managed by the caller.
     try {
       const response = await fetch('/api/send-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ to: email, subject: 'Your OTP for ReferralBridge', htmlBody: `<p>Your OTP for ReferralBridge is: <strong>${otp}</strong></p>` }),
+        body: JSON.stringify({ 
+          to: email, 
+          subject: subject || 'Your OTP for ReferralBridge', 
+          htmlBody: htmlBody || `<p>Your OTP for ReferralBridge is: <strong>${otp}</strong></p>` 
+        }),
       });
       if (!response.ok) {
         const errorData = await response.json();
@@ -84,8 +88,8 @@ const RequestReferralPage = () => {
       }
       return true;
     } catch (error: any) {
-      console.error("Error sending OTP email via API:", error);
-      toast({ variant: "destructive", title: "Email API Error", description: error.message || "Could not send OTP email. Please try again." });
+      console.error("Error sending OTP/email via API:", error);
+      toast({ variant: "destructive", title: "Email API Error", description: error.message || "Could not send email. Please try again." });
       return false;
     }
   };
@@ -224,7 +228,6 @@ const RequestReferralPage = () => {
       description: "Referral Request Fee",
       order_id: orderId,
       handler: async function (response: any) {
-        // setIsLoading(true) should already be true from the calling function
         setPaymentInProgress(true); 
 
         if (!referralDataOnPayment) { 
@@ -282,6 +285,24 @@ const RequestReferralPage = () => {
               status: 'pending', 
               timestamp: new Date(),
             });
+
+            // Send submission confirmation email
+            try {
+              const subject = `Your Referral Request for ${referralDataOnPayment.jobId} has been submitted!`;
+              const htmlBody = `
+                Hello ${referralDataOnPayment.name},<br><br>
+                Your referral request for Job ID: <strong>${referralDataOnPayment.jobId}</strong> at <strong>${referralDataOnPayment.targetCompany}</strong> has been successfully submitted.<br><br>
+                Thank you for choosing ReferralBridge! You will be notified of any actions taken on your resume.<br><br>
+                Best regards,<br>
+                The ReferralBridge Team
+              `;
+              await sendOtpEmailApi(referralDataOnPayment.email, '', subject, htmlBody); // OTP not needed here, just subject & body
+              console.log(`Submission confirmation email sent to ${referralDataOnPayment.email}`);
+            } catch (emailError: any) {
+              console.error("Failed to send submission confirmation email:", emailError.message);
+              // Don't block user flow if email fails, just log it.
+            }
+
 
             toast({ title: "Referral Submitted!", description: "Your referral request has been successfully submitted." });
             sessionStorage.setItem('candidateViewEmail', referralDataOnPayment.email);
