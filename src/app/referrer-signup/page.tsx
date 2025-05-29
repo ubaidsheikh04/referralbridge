@@ -225,16 +225,14 @@ const ReferrerSignupPage = () => {
     } else if (errors.agreeToTerms?.message) {
       toast({ variant: "destructive", title: "Terms Error", description: errors.agreeToTerms.message });
       specificErrorHandled = true;
-    } else if (errors.otp?.message && isVerificationSent) {
+    } else if (errors.otp?.message && isVerificationSent) { // Added OTP check here
       toast({ variant: "destructive", title: "OTP Error", description: errors.otp.message });
       specificErrorHandled = true;
     }
 
     if (specificErrorHandled) {
-      // Log as warning if a specific toast was shown, this is expected validation feedback.
       console.warn("Form validation detected and handled with a specific toast. Errors:", JSON.stringify(errors, null, 2));
     } else if (Object.keys(errors).length > 0) {
-      // An error occurred, but not one of the specific ones above. This is more unexpected.
       console.error("Unhandled Zod validation error or unexpected error structure. Errors:", JSON.stringify(errors, null, 2));
       toast({
         variant: "destructive",
@@ -242,7 +240,6 @@ const ReferrerSignupPage = () => {
         description: "Please correct the highlighted errors in the form.",
       });
     } else {
-      // This case (errors object is empty but error handler was called) remains odd.
       console.error("handleValidationErrors called by react-hook-form with an empty errors object. This is unexpected and may indicate an issue with form state or resolver configuration.");
       toast({
         variant: "destructive",
