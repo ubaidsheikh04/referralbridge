@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Combobox, type ComboboxOption } from "@/components/ui/combobox"; // Import Combobox
+import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import { toast } from "@/hooks/use-toast";
 import { uploadFile } from "@/services/file-upload";
 import { addDoc, collection, serverTimestamp, getDocs, query, where } from "firebase/firestore";
@@ -22,7 +22,7 @@ import Link from 'next/link';
 const formSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
   email: z.string().email({ message: "Invalid email address." }),
-  targetCompany: z.string().min(1, { message: "Target company cannot be empty." }), // Min 1 for custom entries
+  targetCompany: z.string().min(1, { message: "Target company cannot be empty." }),
   jobId: z.string().min(1, { message: "Job ID/Referral ID cannot be empty." }).describe("Check details in job openings"),
   currentCompany: z.string().min(1, { message: "Current company, 'Fresher', or 'N/A' is required." }),
   resume: z.any().refine(
@@ -64,11 +64,11 @@ const companySuggestions: ComboboxOption[] = [
   { value: "Nice", label: "Nice" },
   { value: "Fujitsu", label: "Fujitsu" },
   { value: "Deloitte", label: "Deloitte" },
-  { value: "HCL", label: "HCL Microsoft" }, // Assuming this was meant to be HCL, or HCL Microsoft if distinct
+  { value: "HCL", label: "HCL Microsoft" },
   { value: "Microsoft", label: "Microsoft" },
   { value: "Oracle", label: "Oracle" },
-  { value: "DXC", label: "DXC Technology" }, // Added "Technology" for clarity if common
-  { value: "Mercedes", label: "Mercedes-Benz Group" }, // More specific if intended
+  { value: "DXC", label: "DXC Technology" },
+  { value: "Mercedes", label: "Mercedes-Benz Group" },
   { value: "Salesforce", label: "Salesforce" },
   { value: "PwC", label: "PwC" },
 ];
@@ -167,7 +167,7 @@ const RequestReferralPage = () => {
       setIsLoading(false);
       return;
     }
-    
+
     const { name, email, targetCompany, jobId, currentCompany, resume, agreeToTerms } = formData;
     if (!name || !email || !targetCompany || !jobId || !currentCompany || !(resume instanceof FileList && resume.length > 0) || !agreeToTerms) {
       toast({ variant: "destructive", title: "Missing Information", description: "Please ensure all form fields are filled and terms are agreed to before proceeding." });
@@ -175,13 +175,13 @@ const RequestReferralPage = () => {
       setIsLoading(false);
       return;
     }
-    
-    setCurrentReferralData(formData); // Store form data before initiating payment
+
+    setCurrentReferralData(formData);
 
     if (otpValue === generatedOtp) {
       setIsEmailVerified(true);
       toast({ title: "Email Verified!", description: "Proceeding to payment..." });
-      await createRazorpayOrder(formData); // Pass current form data
+      await createRazorpayOrder(formData);
     } else {
       form.setError("otp", { type: "manual", message: "Invalid OTP." });
       toast({ variant: "destructive", title: "Error", description: "Invalid OTP. Please try again." });
@@ -191,7 +191,7 @@ const RequestReferralPage = () => {
 
   const createRazorpayOrder = async (referralDataForOrder: ReferralFormValues) => {
     setPaymentInProgress(true);
-    setIsLoading(true); 
+    setIsLoading(true);
 
     if (!referralDataForOrder.name || !referralDataForOrder.email || !referralDataForOrder.targetCompany || !referralDataForOrder.jobId || !referralDataForOrder.currentCompany || !referralDataForOrder.agreeToTerms) {
       toast({ variant: 'destructive', title: 'Error', description: 'All fields and terms agreement are required before payment.' });
@@ -211,7 +211,7 @@ const RequestReferralPage = () => {
       const response = await fetch('/api/razorpay/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount: 10000 }), 
+        body: JSON.stringify({ amount: 10000 }),
       });
 
       if (!response.ok) {
@@ -226,19 +226,18 @@ const RequestReferralPage = () => {
       if (!data.orderId || !data.keyId) {
         throw new Error("Received invalid order data from server.");
       }
-      // Pass referralDataForOrder (which is the complete form data) to handleRazorpayPayment
-      handleRazorpayPayment(data.keyId, data.orderId, referralDataForOrder); 
+      handleRazorpayPayment(data.keyId, data.orderId, referralDataForOrder);
     } catch (error: any) {
       console.error('Error creating Razorpay order:', error);
       toast({ variant: 'destructive', title: 'Payment Error', description: error.message || 'Failed to create payment order.' });
-      setIsEmailVerified(false); 
+      setIsEmailVerified(false);
       setIsLoading(false);
       setPaymentInProgress(false);
     }
   };
 
   const handleRazorpayPayment = (keyId: string, orderId: string, referralDataOnPayment: ReferralFormValues | null) => {
-     if (!referralDataOnPayment) { // Check the parameter directly
+     if (!referralDataOnPayment) {
       console.error("Referral data (referralDataOnPayment parameter) is null in handlePayment at the start of Razorpay options");
       toast({ variant: "destructive", title: "Error", description: "Critical: Form data is missing. Cannot proceed with payment." });
       setIsLoading(false);
@@ -248,7 +247,7 @@ const RequestReferralPage = () => {
 
     const options = {
       key: keyId,
-      amount: 10000, 
+      amount: 10000,
       currency: "INR",
       name: "ReferralBridge",
       description: "Referral Request Fee",
@@ -290,7 +289,6 @@ const RequestReferralPage = () => {
             } catch (uploadError: any) {
               console.error("Error uploading resume after payment:", uploadError);
               toast({ variant: "destructive", title: "File Upload Error", description: `Your payment was successful, but resume upload failed: ${uploadError.message}. Please contact support.` });
-              // Continue to save referral data even if resume upload fails, but without resumeUrl
             }
           } else {
             console.warn("Resume file was not in the expected format after payment verification.");
@@ -302,8 +300,8 @@ const RequestReferralPage = () => {
               email: referralDataOnPayment.email,
               targetCompany: referralDataOnPayment.targetCompany,
               jobId: referralDataOnPayment.jobId,
-              currentCompany: referralDataOnPayment.currentCompany, // Save current company
-              resumeUrl: uploadedResumeUrl, // Save resume URL (can be empty if upload failed)
+              currentCompany: referralDataOnPayment.currentCompany,
+              resumeUrl: uploadedResumeUrl,
               paymentId: response.razorpay_payment_id,
               orderId: response.razorpay_order_id,
               paymentStatus: 'paid',
@@ -321,14 +319,14 @@ const RequestReferralPage = () => {
                 Best regards,<br>
                 The ReferralBridge Team
               `;
-              await sendOtpEmailApi(referralDataOnPayment.email, '', subject, htmlBody); // No OTP needed for this email
+              await sendOtpEmailApi(referralDataOnPayment.email, '', subject, htmlBody);
               console.log(`Submission confirmation email sent to ${referralDataOnPayment.email}`);
             } catch (emailError: any) {
               console.error("Failed to send submission confirmation email:", emailError.message);
             }
 
             toast({ title: "Referral Submitted!", description: "Your referral request has been successfully submitted." });
-            sessionStorage.setItem('candidateViewEmail', referralDataOnPayment.email); 
+            sessionStorage.setItem('candidateViewEmail', referralDataOnPayment.email);
             router.push('/thank-you');
           } else {
             toast({ variant: "destructive", title: "Data Error", description: "Key form data was missing. Request not saved." });
@@ -353,14 +351,14 @@ const RequestReferralPage = () => {
         currentCompany: referralDataOnPayment.currentCompany,
       },
       theme: {
-        color: "#FDB813" 
+        color: "#FDB813"
       },
       modal: {
         ondismiss: function () {
           toast({ variant: "default", title: "Payment Cancelled", description: "Your payment was not completed." });
           setIsLoading(false);
           setPaymentInProgress(false);
-          setIsEmailVerified(false); 
+          setIsEmailVerified(false);
         }
       }
     };
@@ -371,7 +369,7 @@ const RequestReferralPage = () => {
         toast({ variant: "destructive", title: "Payment Failed", description: response.error.description || 'Payment failed.' });
         setIsLoading(false);
         setPaymentInProgress(false);
-        setIsEmailVerified(false); 
+        setIsEmailVerified(false);
       });
       rzp.open();
     } else {
@@ -426,7 +424,6 @@ const RequestReferralPage = () => {
 
   useEffect(() => {
     loadRazorpayScript();
-     // Try to get candidate email from session storage if they've submitted a request before
     const candidateEmailFromSession = sessionStorage.getItem('candidateViewEmail');
     if (candidateEmailFromSession) {
         setMyRequestsLookupEmail(candidateEmailFromSession);
@@ -446,15 +443,15 @@ const RequestReferralPage = () => {
     if (isLoading) return "Processing...";
     if (!isOtpSent) return "Send OTP";
     if (!isEmailVerified) return "Verify OTP & Proceed to Pay";
-    return "Payment in Progress"; 
+    return "Payment in Progress";
   };
 
   const isButtonDisabled = () => {
     if (isLoading || paymentInProgress) return true;
-    if (isOtpSent && !isEmailVerified) { 
+    if (isOtpSent && !isEmailVerified) {
       const otpValue = form.getValues("otp");
-      if (!otpValue || otpValue.length !== 6) return true; 
-      
+      if (!otpValue || otpValue.length !== 6) return true;
+
       const { name, email, targetCompany, jobId, currentCompany, resume, agreeToTerms } = form.getValues();
       if (!name || !email || !targetCompany || !jobId || !currentCompany || !agreeToTerms || !resume || (resume instanceof FileList && resume.length === 0)) {
         return true;
@@ -654,10 +651,13 @@ const RequestReferralPage = () => {
                       <div className="space-y-1 leading-none">
                         <FormLabel>
                           I agree to the{' '}
-                          <Link href="/policy" passHref legacyBehavior>
-                            <a target="_blank" rel="noopener noreferrer" className="underline text-primary hover:text-primary/80 cursor-pointer">
-                              Terms and Conditions
-                            </a>
+                          <Link
+                            href="/policy"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="underline text-primary hover:text-primary/80 cursor-pointer"
+                          >
+                            Terms and Conditions
                           </Link>
                         </FormLabel>
                         <FormMessage />
@@ -703,4 +703,3 @@ const RequestReferralPage = () => {
 };
 
 export default RequestReferralPage;
-
