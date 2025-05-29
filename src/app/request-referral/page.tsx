@@ -211,7 +211,7 @@ const RequestReferralPage = () => {
       const response = await fetch('/api/razorpay/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount: 10000 }), // Rs. 100 (10000 paise)
+        body: JSON.stringify({ amount: 9900 }), // Rs. 100 (10000 paise)
       });
 
       if (!response.ok) {
@@ -652,8 +652,7 @@ const RequestReferralPage = () => {
                       <FormLabel>Current Company (or 'Fresher'/'N/A')</FormLabel>
                       <FormControl>
                         <Input placeholder="Your current company, or 'Fresher', 'N/A'" {...field} disabled={isLoading || isEmailVerified || paymentInProgress} />
-                      </FormControl>
-                      <FormDescription>Enter your current employer, or "Fresher" / "N/A" if not applicable.</FormDescription>
+                      </FormControl>    
                       <FormMessage />
                     </FormItem>
                   )}
@@ -713,10 +712,10 @@ const RequestReferralPage = () => {
                 {/* Pricing Information Display */}
                 {!paymentInProgress && (
                   <div className="text-center my-4 p-3 bg-secondary/30 rounded-md border border-border">
-                    <p className="text-sm text-muted-foreground mb-1">Referral Service Fee:</p>
+                    <p className="text-sm text-muted-foreground mb-1">Platform Fee:</p>
                     <p className="text-2xl font-bold text-primary">
-                      ₹100
-                      <s className="text-base font-normal text-muted-foreground ml-2">₹500</s>
+                      ₹99
+                      <s className="text-base font-normal text-muted-foreground ml-2">₹499</s>
                     </p>
                     <p className="text-xs text-accent mt-1">Limited time offer!</p>
                   </div>
