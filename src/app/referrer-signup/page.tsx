@@ -15,6 +15,7 @@ import { auth, db } from '@/services/firebase'; // Import auth and db
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, type UserCredential } from "firebase/auth";
 import { doc, setDoc, serverTimestamp, getDoc } from "firebase/firestore";
 import Link from 'next/link';
+import { Combobox, type ComboboxOption } from "@/components/ui/combobox"; // Import Combobox
 
 const formSchema = z.object({
   companyEmail: z.string().email({
@@ -36,6 +37,29 @@ const formSchema = z.object({
 
 type ReferrerSignupFormValues = z.infer<typeof formSchema>;
 
+// Company suggestions list (same as in request-referral page)
+const companySuggestions: ComboboxOption[] = [
+  { value: "Accenture", label: "Accenture" },
+  { value: "Tata Consultancy Services (TCS)", label: "Tata Consultancy Services (TCS)" },
+  { value: "Infosys", label: "Infosys" },
+  { value: "Capgemini", label: "Capgemini" },
+  { value: "Wipro", label: "Wipro" },
+  { value: "Cognizant", label: "Cognizant" },
+  { value: "Tech Mahindra", label: "Tech Mahindra" },
+  { value: "Amdocs", label: "Amdocs" },
+  { value: "Nice", label: "Nice" },
+  { value: "Fujitsu", label: "Fujitsu" },
+  { value: "Deloitte", label: "Deloitte" },
+  { value: "HCL", label: "HCL Microsoft" }, // Corrected, assuming "HCL" or "HCL Technologies"
+  { value: "Microsoft", label: "Microsoft" },
+  { value: "Oracle", label: "Oracle" },
+  { value: "DXC", label: "DXC Technology" }, // Corrected to "DXC Technology"
+  { value: "Mercedes", label: "Mercedes-Benz Group" }, // Corrected to "Mercedes-Benz Group"
+  { value: "Salesforce", label: "Salesforce" },
+  { value: "PwC", label: "PwC" },
+];
+
+
 const ReferrerSignupPage = () => {
   const [isVerificationSent, setIsVerificationSent] = useState(false);
   const [otpSentToEmail, setOtpSentToEmail] = useState(''); // Stores the email OTP was sent to
@@ -48,7 +72,7 @@ const ReferrerSignupPage = () => {
     defaultValues: {
       companyEmail: "",
       personalEmail: "",
-      otp: undefined, // Changed from "" to undefined
+      otp: undefined,
       company: "",
       agreeToTerms: false,
     },
@@ -159,7 +183,7 @@ const ReferrerSignupPage = () => {
           email: values.personalEmail, 
           companyRegisteredEmail: values.companyEmail, 
           company: values.company,
-          isVerified: true, 
+          isVerified: true, // Personal email is OTP verified
           createdAt: serverTimestamp(),
           lastLogin: serverTimestamp()
         };
@@ -226,7 +250,7 @@ const ReferrerSignupPage = () => {
       } else if (errors.agreeToTerms?.message) {
         toast({ variant: "destructive", title: "Terms Error", description: errors.agreeToTerms.message });
         specificErrorHandled = true;
-      } else if (errors.otp?.message && isVerificationSent) { // Only show OTP error if OTP was sent
+      } else if (errors.otp?.message && isVerificationSent) { 
         toast({ variant: "destructive", title: "OTP Error", description: errors.otp.message });
         specificErrorHandled = true;
       }
@@ -234,7 +258,6 @@ const ReferrerSignupPage = () => {
       if (specificErrorHandled) {
         console.warn("Form validation detected and handled with a specific toast. Errors:", JSON.stringify(errors, null, 2));
       } else if (Object.keys(errors).length > 0 && !(errors.otp && !isVerificationSent) ) { 
-        // If there are errors, but not one of the specific ones, and it's not an OTP error when OTP wasn't sent
         console.error("Unhandled Zod validation error or unexpected error structure. Errors:", JSON.stringify(errors, null, 2));
         toast({
           variant: "destructive",
@@ -251,7 +274,6 @@ const ReferrerSignupPage = () => {
       });
     }
   };
-
 
   return (
     <div className="container mx-auto py-10">
@@ -299,9 +321,13 @@ const ReferrerSignupPage = () => {
               <FormItem>
                 <FormLabel>Company Name</FormLabel>
                 <FormControl>
-                  <Input
-                    placeholder="Enter your company name"
-                    {...field}
+                  <Combobox
+                    options={companySuggestions}
+                    value={field.value}
+                    onChange={field.onChange}
+                    placeholder="Search or type your company name"
+                    searchPlaceholder="Type or Search company..."
+                    emptyResultText="No company found. You can type a custom name."
                     disabled={isVerificationSent || isLoading}
                   />
                 </FormControl>
@@ -372,6 +398,4 @@ const ReferrerSignupPage = () => {
 };
 
 export default ReferrerSignupPage;
-    
-
     
