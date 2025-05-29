@@ -10,16 +10,17 @@ interface ReferralRequest {
     targetCompany: string;
     jobId: string;
     resumeUrl?: string;
-    status?: 'pending' | 'referred' | 'rejected';
+    status?: 'pending' | 'referred' | 'rejected'; // Status is still relevant for candidate view
+    viewCount?: number; // Added viewCount
 }
 
 interface ReferralRequestTileProps {
     request: ReferralRequest;
-    onRefer?: (requestId: string) => Promise<void>;
+    onViewAction?: (requestId: string) => Promise<void>; // Renamed from onRefer
     viewMode?: 'referrer' | 'candidate';
 }
 
-const ReferralRequestTile: React.FC<ReferralRequestTileProps> = ({ request, onRefer, viewMode = 'referrer' }) => {
+const ReferralRequestTile: React.FC<ReferralRequestTileProps> = ({ request, onViewAction, viewMode = 'referrer' }) => {
     const [isExpanded, setIsExpanded] = useState(false);
     const [showConfirmationModal, setShowConfirmationModal] = useState(false);
 
@@ -51,28 +52,28 @@ const ReferralRequestTile: React.FC<ReferralRequestTileProps> = ({ request, onRe
         }
     };
 
-    const handleConfirmRefer = async () => {
+    const handleConfirmViewAction = async () => {
         setShowConfirmationModal(false);
         if (request.resumeUrl) {
             window.open(request.resumeUrl, '_blank');
             await sendResumeViewedNotification();
         }
-        if (onRefer) {
+        if (onViewAction) {
             try {
-                await onRefer(request.id);
-                // Visual update will now primarily come from prop changes when parent re-fetches
+                await onViewAction(request.id);
             } catch (error) {
-                console.error("Error during onRefer call:", error);
+                console.error("Error during onViewAction call:", error);
                 toast({
                     variant: "destructive",
                     title: "Error",
-                    description: "Failed to mark as referred.",
+                    description: "Failed to process view action.",
                 });
             }
         }
     };
     
     const getStatusColor = (status?: string) => {
+        // This function remains as candidates still see their status
         switch (status) {
             case 'referred': return 'text-green-500';
             case 'rejected': return 'text-red-500';
@@ -86,8 +87,8 @@ const ReferralRequestTile: React.FC<ReferralRequestTileProps> = ({ request, onRe
             {viewMode === 'referrer' && (
                 <ConfirmationModal
                     show={showConfirmationModal}
-                    message="Are you willing to refer this candidate? Note: Proceeding will mark this candidate as referred, open their resume, and notify the candidate their resume has been viewed."
-                    onConfirm={handleConfirmRefer}
+                    message="You are about to view this candidate's resume. This will notify the candidate and increment the view count. Proceed?"
+                    onConfirm={handleConfirmViewAction}
                     onCancel={() => setShowConfirmationModal(false)}
                 />
             )}
@@ -97,13 +98,14 @@ const ReferralRequestTile: React.FC<ReferralRequestTileProps> = ({ request, onRe
                     ${isExpanded ? "h-auto" : "h-[100px] overflow-hidden"}`}
                 onClick={toggleExpanded}
             >
-                <h3 className={`font-semibold text-lg mb-1 ${viewMode === 'referrer' && request.status === 'referred' ? "text-muted-foreground" : "text-primary"}`}>
+                <h3 className="font-semibold text-lg mb-1 text-primary">
                     {request.name}
                 </h3>
                 {!isExpanded && (
                      <p className="text-sm text-muted-foreground truncate">
-                        {viewMode === 'referrer' && request.status === 'referred' ? `Status: Referred` : 
-                         (viewMode === 'candidate' ? `Status: ${request.status ? request.status.charAt(0).toUpperCase() + request.status.slice(1) : 'Pending'}` : 'Click to view details...')}
+                        {viewMode === 'candidate' 
+                            ? `Status: ${request.status ? request.status.charAt(0).toUpperCase() + request.status.slice(1) : 'Pending'}` 
+                            : `Viewed by ${request.viewCount || 0} referrer(s)`}
                     </p>
                 )}
 
@@ -128,20 +130,19 @@ const ReferralRequestTile: React.FC<ReferralRequestTileProps> = ({ request, onRe
                                 {request.resumeUrl ? (
                                     <button
                                         onClick={(e) => {
-                                        e.stopPropagation(); 
-                                        if (onRefer) setShowConfirmationModal(true);
+                                            e.stopPropagation(); 
+                                            if (onViewAction) setShowConfirmationModal(true);
                                         }}
-                                        disabled={!onRefer || !request.resumeUrl}
+                                        disabled={!onViewAction || !request.resumeUrl}
                                         className="text-accent-foreground bg-accent hover:bg-accent/80 px-3 py-1 rounded text-xs font-medium transition-colors duration-300 disabled:opacity-50"
                                     >
-                                        View Resume & Refer
+                                        View Resume & Notify Candidate
                                     </button>
                                 ) : (
                                     <p className="text-muted-foreground text-xs">No resume submitted by candidate.</p>
                                 )}
-                                {request.status === 'referred' && (
-                                    <p className={`text-xs font-medium ${getStatusColor('referred')}`}>This candidate has been marked as referred.</p>
-                                )}
+                                <p className="text-xs text-muted-foreground">Viewed by {request.viewCount || 0} referrer(s).</p>
+                                {/* Removed "This candidate has been marked as referred." */}
                             </div>
                         )}
                     </div>

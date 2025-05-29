@@ -3,13 +3,13 @@
 
 import { SidebarProvider, Sidebar, SidebarContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarGroup, SidebarGroupLabel } from "@/components/ui/sidebar";
 import React, { useEffect, useState } from 'react';
-import { collection, getDocs, query, where, doc, updateDoc } from "firebase/firestore";
+import { collection, getDocs, query, where, doc, updateDoc, increment, getDoc } from "firebase/firestore"; // Added increment and getDoc
 import { db } from "@/services/firebase";
 import ReferralRequestTile from "@/components/ReferralRequestTile";
 import { toast } from "@/hooks/use-toast";
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { HomeIcon, Briefcase } from 'lucide-react'; // Added Briefcase
+import { HomeIcon, Briefcase } from 'lucide-react';
 
 interface ReferralRequestData {
   id: string;
@@ -18,14 +18,15 @@ interface ReferralRequestData {
   targetCompany: string;
   jobId: string;
   resumeUrl?: string;
-  status?: 'pending' | 'referred' | 'rejected';
+  status?: 'pending' | 'referred' | 'rejected'; // Status is still relevant for candidate view
   paymentStatus?: string;
+  viewCount?: number; // Added viewCount
 }
 
 const DashboardPage = () => {
   const [companyReferrals, setCompanyReferrals] = useState<ReferralRequestData[]>([]);
-  const [company, setCompany] = useState(''); // For referrer's company
-  const [referrerEmail, setReferrerEmail] = useState(''); // Store referrer's email
+  const [company, setCompany] = useState('');
+  const [referrerEmail, setReferrerEmail] = useState('');
   const [isLoadingCompanyReferrals, setIsLoadingCompanyReferrals] = useState(true);
 
   useEffect(() => {
@@ -44,12 +45,12 @@ const DashboardPage = () => {
     }
   }, []);
 
-  // Fetch company referrals (for logged-in referrer)
   useEffect(() => {
-    if (company && referrerEmail) { // Ensure user is a referrer
+    if (company && referrerEmail) {
       const fetchCompanyReferrals = async () => {
         setIsLoadingCompanyReferrals(true);
         const referralCollectionRef = collection(db, 'referralRequests');
+        // We still only fetch paid requests
         const q = query(referralCollectionRef, where("targetCompany", "==", company), where("paymentStatus", "==", "paid"));
         try {
           const querySnapshot = await getDocs(q);
@@ -69,29 +70,36 @@ const DashboardPage = () => {
       fetchCompanyReferrals();
     } else {
         setCompanyReferrals([]);
-        setIsLoadingCompanyReferrals(false); // Set loading to false if no company/email
+        setIsLoadingCompanyReferrals(false);
     }
   }, [company, referrerEmail]);
 
-  const handleRefer = async (requestId: string) => {
+  const handleViewResumeAction = async (requestId: string) => {
     const requestRef = doc(db, 'referralRequests', requestId);
     try {
-      await updateDoc(requestRef, { status: 'referred' });
+      // Increment viewCount in Firestore
+      await updateDoc(requestRef, {
+        viewCount: increment(1)
+      });
+
+      // Update local state to reflect the new view count
       setCompanyReferrals(prevRequests =>
         prevRequests.map(req =>
-          req.id === requestId ? { ...req, status: 'referred' } : req
+          req.id === requestId ? { ...req, viewCount: (req.viewCount || 0) + 1 } : req
         )
       );
+      // We are no longer setting status to 'referred' here.
+      // The "resume viewed" email is sent from the tile itself.
       toast({
-        title: "Success",
-        description: "Candidate marked as referred.",
+        title: "Action Logged",
+        description: "Resume view has been recorded.",
       });
     } catch (error) {
-      console.error("Error updating referral status:", error);
+      console.error("Error updating view count:", error);
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to update referral status.",
+        description: "Failed to update view count.",
       });
     }
   };
@@ -101,21 +109,21 @@ const DashboardPage = () => {
     if (!referrerEmail) return <p className="text-foreground">Please sign up or log in as a referrer to view company referrals.</p>;
     if (!company && referrerEmail) return <p className="text-foreground">Company information not found. Please ensure you signed up with a company.</p>;
     if (companyReferrals.length === 0) return <p className="text-foreground">No referral requests currently available for {company}.</p>;
-    
+
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {companyReferrals.map((request) => (
           <ReferralRequestTile
             key={request.id}
             request={request}
-            onRefer={handleRefer}
+            onViewAction={handleViewResumeAction} // Changed prop name for clarity
             viewMode="referrer"
           />
         ))}
       </div>
     );
   };
-  
+
   const getPageTitle = () => {
     if (!referrerEmail) return "Referrer Dashboard";
     return company ? `Referral Requests for ${company}` : "Company Referrals (Company not specified)";
@@ -130,9 +138,9 @@ const DashboardPage = () => {
               <SidebarGroupLabel>Menu</SidebarGroupLabel>
               <SidebarMenu>
                 <SidebarMenuItem>
-                  <SidebarMenuButton 
-                    className={'bg-sidebar-accent text-sidebar-accent-foreground'} // Always active
-                    disabled={!referrerEmail} 
+                  <SidebarMenuButton
+                    className={'bg-sidebar-accent text-sidebar-accent-foreground'}
+                    disabled={!referrerEmail}
                   >
                     <Briefcase className="mr-2 h-4 w-4" /> Company Referrals
                   </SidebarMenuButton>
