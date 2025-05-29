@@ -12,12 +12,14 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import { toast } from "@/hooks/use-toast";
 import { uploadFile } from "@/services/file-upload";
-import { addDoc, collection, serverTimestamp, getDocs, query, where } from "firebase/firestore";
-import { db } from "@/services/firebase";
+// Use addDocument from our firebase service if needed for specific logic, or firestoreAddDoc directly
+import { db, collection, serverTimestamp, addDocument as addFirestoreDocument } from "@/services/firebase"; // Import serverTimestamp
 import { useRouter } from 'next/navigation';
 import Script from 'next/script';
 import ReferralRequestTile from '@/components/ReferralRequestTile';
 import Link from 'next/link';
+import { getDocs, query, where } from "firebase/firestore";
+
 
 const formSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
@@ -176,7 +178,7 @@ const RequestReferralPage = () => {
       return;
     }
 
-    setCurrentReferralData(formData); // Set currentReferralData before initiating payment
+    setCurrentReferralData(formData); 
 
     if (otpValue === generatedOtp) {
       setIsEmailVerified(true);
@@ -191,8 +193,9 @@ const RequestReferralPage = () => {
 
   const createRazorpayOrder = async (referralDataForOrder: ReferralFormValues) => {
     setPaymentInProgress(true);
-    setIsLoading(true);
+    setIsLoading(true); // Ensure loading state is true
 
+    // Double-check referral data (already done in handleVerifyOtpAndProceedToPayment, but good for safety)
     if (!referralDataForOrder.name || !referralDataForOrder.email || !referralDataForOrder.targetCompany || !referralDataForOrder.jobId || !referralDataForOrder.currentCompany || !referralDataForOrder.agreeToTerms) {
       toast({ variant: 'destructive', title: 'Error', description: 'All fields and terms agreement are required before payment.' });
       setIsLoading(false);
@@ -206,12 +209,12 @@ const RequestReferralPage = () => {
       setPaymentInProgress(false);
       return;
     }
-
+    
     try {
       const response = await fetch('/api/razorpay/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount: 9900 }), // Rs. 100 (10000 paise)
+        body: JSON.stringify({ amount: 9900 }), // Rs. 99 (9900 paise)
       });
 
       if (!response.ok) {
@@ -226,18 +229,19 @@ const RequestReferralPage = () => {
       if (!data.orderId || !data.keyId) {
         throw new Error("Received invalid order data from server.");
       }
-      handleRazorpayPayment(data.keyId, data.orderId, referralDataForOrder); // Pass referralDataForOrder
+      // Pass currentReferralData which should be set by handleVerifyOtpAndProceedToPayment
+      handleRazorpayPayment(data.keyId, data.orderId, referralDataForOrder); 
     } catch (error: any) {
       console.error('Error creating Razorpay order:', error);
       toast({ variant: 'destructive', title: 'Payment Error', description: error.message || 'Failed to create payment order.' });
-      setIsEmailVerified(false); // Reset email verification on payment error
+      setIsEmailVerified(false); 
       setIsLoading(false);
       setPaymentInProgress(false);
     }
   };
 
   const handleRazorpayPayment = (keyId: string, orderId: string, referralDataOnPayment: ReferralFormValues | null) => {
-     if (!referralDataOnPayment) { // Use the parameter directly
+     if (!referralDataOnPayment) {
       console.error("Referral data (referralDataOnPayment parameter) is null in handlePayment at the start of Razorpay options");
       toast({ variant: "destructive", title: "Error", description: "Critical: Form data is missing. Cannot proceed with payment." });
       setIsLoading(false);
@@ -247,14 +251,13 @@ const RequestReferralPage = () => {
 
     const options = {
       key: keyId,
-      amount: 10000, // Rs. 100 (10000 paise)
+      amount: 9900, // Rs. 99
       currency: "INR",
       name: "ReferralBridge",
       description: "Referral Request Fee",
       order_id: orderId,
       handler: async function (response: any) {
-        // This function is called when payment is successful
-        if (!referralDataOnPayment) { // Double check, though it should be set
+        if (!referralDataOnPayment) { 
           console.error("Critical: referralDataOnPayment is null in payment handler callback.");
           toast({ variant: "destructive", title: "Error", description: "Session data lost. Cannot save referral." });
           setIsLoading(false);
@@ -263,7 +266,6 @@ const RequestReferralPage = () => {
         }
 
         try {
-          // Verify payment signature on your backend
           const verificationResponse = await fetch('/api/razorpay/verify-payment', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -291,15 +293,13 @@ const RequestReferralPage = () => {
             } catch (uploadError: any) {
               console.error("Error uploading resume after payment:", uploadError);
               toast({ variant: "destructive", title: "File Upload Error", description: `Your payment was successful, but resume upload failed: ${uploadError.message}. Please contact support.` });
-              // Still proceed to save other data even if resume upload fails here, as payment is done.
             }
           } else {
             console.warn("Resume file was not in the expected format after payment verification.");
           }
 
-          // Save referral request to Firestore
           if (referralDataOnPayment.name && referralDataOnPayment.email && referralDataOnPayment.targetCompany && referralDataOnPayment.jobId && referralDataOnPayment.currentCompany) {
-            await addDoc(collection(db, 'referralRequests'), {
+            await addFirestoreDocument( 'referralRequests', { // Using renamed addFirestoreDocument
               name: referralDataOnPayment.name,
               email: referralDataOnPayment.email,
               targetCompany: referralDataOnPayment.targetCompany,
@@ -309,12 +309,11 @@ const RequestReferralPage = () => {
               paymentId: response.razorpay_payment_id,
               orderId: response.razorpay_order_id,
               paymentStatus: 'paid',
-              status: 'pending', // Initial status for a new paid request
-              timestamp: serverTimestamp(),
-              viewCount: 0, // Initialize viewCount
+              status: 'pending', 
+              timestamp: serverTimestamp(), 
+              viewCount: 0,
             });
 
-            // Send submission confirmation email
             try {
               const subject = `Your Referral Request for ${referralDataOnPayment.jobId} has been submitted!`;
               const htmlBody = `
@@ -324,18 +323,16 @@ const RequestReferralPage = () => {
                 Best regards,<br>
                 The ReferralBridge Team
               `;
-              await sendOtpEmailApi(referralDataOnPayment.email, '', subject, htmlBody); // OTP is empty as it's not an OTP email
+              await sendOtpEmailApi(referralDataOnPayment.email, '', subject, htmlBody); 
               console.log(`Submission confirmation email sent to ${referralDataOnPayment.email}`);
             } catch (emailError: any) {
               console.error("Failed to send submission confirmation email:", emailError.message);
-              // Don't let email failure block the thank you page, but log it.
             }
 
             toast({ title: "Referral Submitted!", description: "Your referral request has been successfully submitted." });
-            sessionStorage.setItem('candidateViewEmail', referralDataOnPayment.email); // Store email for "My Requests"
+            sessionStorage.setItem('candidateViewEmail', referralDataOnPayment.email);
             router.push('/thank-you');
           } else {
-            // This case should ideally not be reached if form validation is robust
             toast({ variant: "destructive", title: "Data Error", description: "Key form data was missing after payment. Request not saved. Please contact support." });
           }
         } catch (error: any) {
@@ -358,14 +355,14 @@ const RequestReferralPage = () => {
         currentCompany: referralDataOnPayment.currentCompany,
       },
       theme: {
-        color: "#FDB813" // ReferralBridge accent color
+        color: "#FDB813" 
       },
       modal: {
         ondismiss: function () {
           toast({ variant: "default", title: "Payment Cancelled", description: "Your payment was not completed." });
           setIsLoading(false);
           setPaymentInProgress(false);
-          setIsEmailVerified(false); // Reset email verification if payment is cancelled
+          setIsEmailVerified(false); 
         }
       }
     };
@@ -376,7 +373,7 @@ const RequestReferralPage = () => {
         toast({ variant: "destructive", title: "Payment Failed", description: response.error.description || 'Payment failed.' });
         setIsLoading(false);
         setPaymentInProgress(false);
-        setIsEmailVerified(false); // Reset email verification on payment failure
+        setIsEmailVerified(false); 
       });
       rzp.open();
     } else {
@@ -386,47 +383,43 @@ const RequestReferralPage = () => {
     }
   };
 
-  // Function to load Razorpay script
   const loadRazorpayScript = (callback?: () => void) => {
-    if (typeof window === 'undefined') return; // Don't run on server
+    if (typeof window === 'undefined') return; 
 
     const existingScript = document.getElementById('razorpay-checkout-js');
     if (existingScript && (window as any).Razorpay) {
-      callback?.(); // If already loaded and Razorpay object exists, call callback
+      callback?.(); 
       return;
     }
     if (existingScript) {
-      // If script tag exists but Razorpay object might not, wait for load
       existingScript.addEventListener('load', () => {
         if ((window as any).Razorpay) {
           callback?.();
         } else {
-          // This case is unlikely if the script tag exists and loaded.
           toast({ variant: 'destructive', title: 'Error', description: 'Payment gateway failed to initialize after loading. Please refresh.' });
-          setIsLoading(false); // Stop loading indicators
+          setIsLoading(false); 
           setPaymentInProgress(false);
         }
       });
       return;
     }
 
-    // If script tag doesn't exist, create and load it
     const script = document.createElement('script');
     script.id = 'razorpay-checkout-js';
     script.src = 'https://checkout.razorpay.com/v1/checkout.js';
     script.async = true;
     script.onload = () => {
       if ((window as any).Razorpay) {
-        callback?.(); // Call callback after script loads and Razorpay object exists
+        callback?.(); 
       } else {
         toast({ variant: 'destructive', title: 'Error', description: 'Payment gateway failed to initialize. Please refresh.' });
-        setIsLoading(false); // Stop loading indicators
+        setIsLoading(false); 
         setPaymentInProgress(false);
       }
     };
     script.onerror = () => {
       toast({ variant: 'destructive', title: 'Error', description: 'Failed to load payment gateway. Please check your connection and refresh.' });
-      setIsLoading(false); // Stop loading indicators
+      setIsLoading(false); 
       setPaymentInProgress(false);
     };
     document.body.appendChild(script);
@@ -434,11 +427,7 @@ const RequestReferralPage = () => {
 
 
   useEffect(() => {
-    // Load Razorpay script once the component mounts.
-    // No callback needed here, just ensure it's loaded for later use.
     loadRazorpayScript();
-
-    // Attempt to get email from session for "My Requests" view
     const candidateEmailFromSession = sessionStorage.getItem('candidateViewEmail');
     if (candidateEmailFromSession) {
         setMyRequestsLookupEmail(candidateEmailFromSession);
@@ -449,10 +438,7 @@ const RequestReferralPage = () => {
   const getButtonAction = () => {
     if (!isOtpSent) return handleSendOtp;
     if (!isEmailVerified) return handleVerifyOtpAndProceedToPayment;
-    // If email is verified, the next action is payment, handled by handleVerifyOtpAndProceedToPayment
-    // No direct button action needed here as Razorpay modal takes over.
-    // The button text will be "Payment in Progress" or similar and disabled.
-    return () => { }; // No-op if payment is already in progress or verified
+    return () => { }; 
   };
 
   const getButtonText = () => {
@@ -461,38 +447,30 @@ const RequestReferralPage = () => {
     if (isLoading) return "Processing...";
     if (!isOtpSent) return "Send OTP";
     if (!isEmailVerified) return "Verify OTP & Proceed to Pay";
-    return "Payment in Progress"; // Or "Ready for Payment" / "Proceed to Payment"
+    return "Payment in Progress"; 
   };
 
   const isButtonDisabled = () => {
-    if (isLoading || paymentInProgress) return true; // Disable if any loading or payment is active
+    if (isLoading || paymentInProgress) return true; 
 
-    // For "Send OTP" stage
     if (!isOtpSent) {
-      // Disable if email is invalid or terms not agreed
-      // This check could be more dynamic based on form.getFieldState("email").invalid but form.getValues is simpler here.
       if (form.getFieldState("email").invalid || !form.getValues("email") || !form.getValues("agreeToTerms")) {
         return true;
       }
-      // Optionally, check other required fields too before allowing OTP send
       const { name, targetCompany, jobId, currentCompany, resume } = form.getValues();
       if (!name || !targetCompany || !jobId || !currentCompany || !resume || (resume instanceof FileList && resume.length === 0)) {
-         return true; // Keep disabled if core fields aren't touched.
+         return true; 
       }
     }
-    // For "Verify OTP & Proceed to Pay" stage
     if (isOtpSent && !isEmailVerified) {
       const otpValue = form.getValues("otp");
-      if (!otpValue || otpValue.length !== 6) return true; // Disable if OTP is not 6 digits
-
-      // Also ensure all other form fields are valid before proceeding to payment
-      // This re-checks all fields, useful if user changed something after OTP was sent
+      if (!otpValue || otpValue.length !== 6) return true; 
       const { name, email, targetCompany, jobId, currentCompany, resume, agreeToTerms } = form.getValues();
       if (!name || !email || !targetCompany || !jobId || !currentCompany || !agreeToTerms || !resume || (resume instanceof FileList && resume.length === 0)) {
         return true;
       }
     }
-    return false; // Enable button if no conditions above met
+    return false; 
   };
 
   const handleFetchMyRequests = async () => {
@@ -501,15 +479,14 @@ const RequestReferralPage = () => {
       return;
     }
     setIsLoadingMyRequests(true);
-    setMyFetchedRequests([]); // Clear previous results
+    setMyFetchedRequests([]); 
     const referralCollectionRef = collection(db, 'referralRequests');
-    // Query for requests matching the email and where paymentStatus is 'paid'
     const q = query(referralCollectionRef, where("email", "==", myRequestsLookupEmail), where("paymentStatus", "==", "paid"));
     try {
       const querySnapshot = await getDocs(q);
       const requests = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ReferralRequestData));
       setMyFetchedRequests(requests);
-      setCurrentView('requestsDisplay'); // Switch to display view
+      setCurrentView('requestsDisplay'); 
       if (requests.length === 0) {
         toast({ title: "No Requests", description: "No paid referral requests found for this email." });
       }
@@ -527,7 +504,6 @@ const RequestReferralPage = () => {
         return (
           <div className="space-y-6">
             <h2 className="text-2xl font-semibold text-center text-primary">View Your Requests</h2>
-            {/* Use basic HTML label and div, not FormItem/FormLabel from react-hook-form here */}
             <div className="space-y-2">
               <label htmlFor="lookup-email" className="block text-sm font-medium text-foreground">Your Email Address</label>
               <Input
@@ -660,7 +636,7 @@ const RequestReferralPage = () => {
                 <FormField
                   control={form.control}
                   name="resume"
-                  render={({ field: { onChange, value, ...rest } }) => ( // Ensure correct handling of file input
+                  render={({ field: { onChange, value, ...rest } }) => ( 
                     <FormItem>
                       <FormLabel>Resume (PDF or DOCX)</FormLabel>
                       <FormControl>
@@ -685,7 +661,7 @@ const RequestReferralPage = () => {
                       <div className="space-y-1 leading-none">
                         <FormLabel>
                           I agree to the{' '}
-                          <Link href="/policy" target="_blank" rel="noopener noreferrer" className="underline text-primary hover:text-primary/80 cursor-pointer">
+                           <Link href="/policy" target="_blank" rel="noopener noreferrer" className="underline text-primary hover:text-primary/80 cursor-pointer">
                                Terms and Conditions
                           </Link>
                         </FormLabel>
@@ -709,7 +685,6 @@ const RequestReferralPage = () => {
                     )}
                   />
                 )}
-                {/* Pricing Information Display */}
                 {!paymentInProgress && (
                   <div className="text-center my-4 p-3 bg-secondary/30 rounded-md border border-border">
                     <p className="text-sm text-muted-foreground mb-1">Platform Fee:</p>
@@ -733,7 +708,6 @@ const RequestReferralPage = () => {
 
   return (
     <>
-      {/* Ensure Razorpay script is loaded via next/script for proper handling */}
       <Script id="razorpay-checkout-js-loader" src="https://checkout.razorpay.com/v1/checkout.js" strategy="lazyOnload" onLoad={() => console.log("Razorpay script loaded via next/script.")} />
       <div className="container mx-auto p-4">
         <div className="max-w-lg mx-auto bg-card text-card-foreground rounded-lg shadow-lg p-8 mt-10 border border-border">
@@ -745,5 +719,3 @@ const RequestReferralPage = () => {
 };
 
 export default RequestReferralPage;
-
-    
