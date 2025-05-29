@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -14,7 +15,7 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
           className
         )}
         ref={ref}
-        value={value}
+        value={value ?? ''} // Ensure value is always a string (empty if null/undefined)
         onChange={onChange}
         {...props}
       />
