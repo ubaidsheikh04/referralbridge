@@ -103,7 +103,7 @@ const ReferrerSignupPage = () => {
         description: `Please check your email (${targetEmail}) for the OTP.`,
       });
     }
-    // setIsLoading(false) is handled by sendOtpEmailApi's finally block
+    setIsLoading(false);
   };
 
   const verifyOtpAndProceed = async (values: ReferrerSignupFormValues) => {
@@ -225,10 +225,11 @@ const ReferrerSignupPage = () => {
     } else if (errors.agreeToTerms?.message) {
       toast({ variant: "destructive", title: "Terms Error", description: errors.agreeToTerms.message });
       specificErrorHandled = true;
-    } else if (errors.otp?.message && isVerificationSent) { // Added OTP check here
+    } else if (errors.otp?.message) { // Removed '&& isVerificationSent'
       toast({ variant: "destructive", title: "OTP Error", description: errors.otp.message });
       specificErrorHandled = true;
     }
+
 
     if (specificErrorHandled) {
       console.warn("Form validation detected and handled with a specific toast. Errors:", JSON.stringify(errors, null, 2));
