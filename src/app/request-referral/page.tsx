@@ -8,13 +8,15 @@ import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox"; // Added Checkbox
 import { toast } from "@/hooks/use-toast";
 import { uploadFile } from "@/services/file-upload";
-import { addDoc, collection, serverTimestamp } from "firebase/firestore"; // Added serverTimestamp
-import { db } from "@/services/firebase"; // Ensure db is correctly imported
+import { addDoc, collection, serverTimestamp, getDocs, query, where } from "firebase/firestore";
+import { db } from "@/services/firebase";
 import { useRouter } from 'next/navigation';
 import Script from 'next/script';
 import ReferralRequestTile from '@/components/ReferralRequestTile';
+import Link from 'next/link'; // Added Link
 
 const formSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
@@ -27,6 +29,9 @@ const formSchema = z.object({
     "Resume (PDF or DOCX) is required."
   ),
   otp: z.string().length(6, { message: "OTP must be 6 digits." }).optional(),
+  agreeToTerms: z.boolean().refine(val => val === true, {
+    message: "You must agree to the terms and conditions to proceed."
+  }),
 });
 
 type ReferralFormValues = z.infer<typeof formSchema>;
@@ -70,10 +75,12 @@ const RequestReferralPage = () => {
       currentCompany: "",
       resume: undefined,
       otp: "",
+      agreeToTerms: false,
     },
   });
 
   const sendOtpEmailApi = async (email: string, otp: string, subject?: string, htmlBody?: string) => {
+    setIsLoading(true);
     try {
       const response = await fetch('/api/send-otp', {
         method: 'POST',
@@ -94,18 +101,20 @@ const RequestReferralPage = () => {
       console.error("Error sending OTP/email via API:", error);
       toast({ variant: "destructive", title: "Email API Error", description: error.message || "Could not send email. Please try again." });
       return false;
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleSendOtp = async () => {
     setIsLoading(true);
-    const preOtpFieldsValid = await form.trigger(["name", "email", "targetCompany", "jobId", "currentCompany", "resume"]);
+    const preOtpFieldsValid = await form.trigger(["name", "email", "targetCompany", "jobId", "currentCompany", "resume", "agreeToTerms"]);
 
     if (!preOtpFieldsValid) {
       toast({
         variant: "destructive",
         title: "Missing Information",
-        description: "Please fill in all required fields correctly before sending an OTP.",
+        description: "Please fill in all required fields and agree to the terms before sending an OTP.",
       });
       setIsLoading(false);
       return;
@@ -136,10 +145,10 @@ const RequestReferralPage = () => {
       return;
     }
 
-    const { name, email, targetCompany, jobId, currentCompany, resume } = formData;
-    if (!name || !email || !targetCompany || !jobId || !currentCompany || !(resume instanceof FileList && resume.length > 0)) {
-      toast({ variant: "destructive", title: "Missing Information", description: "Please ensure all form fields are filled before proceeding." });
-      form.trigger(["name", "email", "targetCompany", "jobId", "currentCompany", "resume"]);
+    const { name, email, targetCompany, jobId, currentCompany, resume, agreeToTerms } = formData;
+    if (!name || !email || !targetCompany || !jobId || !currentCompany || !(resume instanceof FileList && resume.length > 0) || !agreeToTerms) {
+      toast({ variant: "destructive", title: "Missing Information", description: "Please ensure all form fields are filled and terms are agreed to before proceeding." });
+      form.trigger(["name", "email", "targetCompany", "jobId", "currentCompany", "resume", "agreeToTerms"]);
       setIsLoading(false);
       return;
     }
@@ -159,9 +168,10 @@ const RequestReferralPage = () => {
 
   const createRazorpayOrder = async (referralData: ReferralFormValues) => {
     setPaymentInProgress(true);
+    setIsLoading(true); // Keep loading active during payment initiation
 
-    if (!referralData.name || !referralData.email || !referralData.targetCompany || !referralData.jobId || !referralData.currentCompany) {
-      toast({ variant: 'destructive', title: 'Error', description: 'All fields are required before payment.' });
+    if (!referralData.name || !referralData.email || !referralData.targetCompany || !referralData.jobId || !referralData.currentCompany || !referralData.agreeToTerms) {
+      toast({ variant: 'destructive', title: 'Error', description: 'All fields and terms agreement are required before payment.' });
       setIsLoading(false);
       setPaymentInProgress(false);
       return;
@@ -179,7 +189,7 @@ const RequestReferralPage = () => {
       const response = await fetch('/api/razorpay/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount: 10000 }),
+        body: JSON.stringify({ amount: 10000 }), // Amount in paisa (e.g., 10000 for INR 100)
       });
 
       if (!response.ok) {
@@ -202,14 +212,14 @@ const RequestReferralPage = () => {
     } catch (error: any) {
       console.error('Error creating Razorpay order:', error);
       toast({ variant: 'destructive', title: 'Payment Error', description: error.message || 'Failed to create payment order.' });
-      setIsEmailVerified(false);
+      setIsEmailVerified(false); // Reset verification if payment setup fails
       setIsLoading(false);
       setPaymentInProgress(false);
     }
   };
 
   const handleRazorpayPayment = (keyId: string, orderId: string, referralDataOnPayment: ReferralFormValues | null) => {
-    if (!referralDataOnPayment) {
+     if (!referralDataOnPayment) {
       console.error("Referral data (referralDataOnPayment parameter) is null in handlePayment at the start of Razorpay options");
       toast({ variant: "destructive", title: "Error", description: "Critical: Form data is missing. Cannot proceed with payment." });
       setIsLoading(false);
@@ -219,14 +229,13 @@ const RequestReferralPage = () => {
 
     const options = {
       key: keyId,
-      amount: 10000,
+      amount: 10000, // Amount in paisa
       currency: "INR",
       name: "ReferralBridge",
       description: "Referral Request Fee",
       order_id: orderId,
       handler: async function (response: any) {
-        setPaymentInProgress(true);
-
+        // No explicit setPaymentInProgress(true) here, it should already be true
         if (!referralDataOnPayment) {
           console.error("Critical: referralDataOnPayment is null in payment handler callback.");
           toast({ variant: "destructive", title: "Error", description: "Session data lost. Cannot save referral." });
@@ -263,7 +272,6 @@ const RequestReferralPage = () => {
             } catch (uploadError: any) {
               console.error("Error uploading resume after payment:", uploadError);
               toast({ variant: "destructive", title: "File Upload Error", description: `Your payment was successful, but resume upload failed: ${uploadError.message}. Please contact support.` });
-              // Continue to save the request even if resume upload fails, but without resumeUrl
             }
           } else {
             console.warn("Resume file was not in the expected format after payment verification.");
@@ -281,7 +289,7 @@ const RequestReferralPage = () => {
               orderId: response.razorpay_order_id,
               paymentStatus: 'paid',
               status: 'pending',
-              timestamp: serverTimestamp(), // Use serverTimestamp
+              timestamp: serverTimestamp(),
               viewCount: 0,
             });
 
@@ -298,10 +306,11 @@ const RequestReferralPage = () => {
               console.log(`Submission confirmation email sent to ${referralDataOnPayment.email}`);
             } catch (emailError: any) {
               console.error("Failed to send submission confirmation email:", emailError.message);
+              // Do not block redirect for email failure
             }
 
             toast({ title: "Referral Submitted!", description: "Your referral request has been successfully submitted." });
-            sessionStorage.setItem('candidateViewEmail', referralDataOnPayment.email);
+            sessionStorage.setItem('candidateViewEmail', referralDataOnPayment.email); // For "My Requests" view
             router.push('/thank-you');
           } else {
             toast({ variant: "destructive", title: "Data Error", description: "Key form data was missing. Request not saved." });
@@ -326,14 +335,14 @@ const RequestReferralPage = () => {
         currentCompany: referralDataOnPayment.currentCompany,
       },
       theme: {
-        color: "#FDB813"
+        color: "#FDB813" // Accent color from your theme
       },
       modal: {
         ondismiss: function () {
           toast({ variant: "default", title: "Payment Cancelled", description: "Your payment was not completed." });
           setIsLoading(false);
           setPaymentInProgress(false);
-          setIsEmailVerified(false);
+          setIsEmailVerified(false); // Reset email verification status
         }
       }
     };
@@ -344,7 +353,7 @@ const RequestReferralPage = () => {
         toast({ variant: "destructive", title: "Payment Failed", description: response.error.description || 'Payment failed.' });
         setIsLoading(false);
         setPaymentInProgress(false);
-        setIsEmailVerified(false);
+        setIsEmailVerified(false); // Reset email verification
       });
       rzp.open();
     } else {
@@ -406,6 +415,8 @@ const RequestReferralPage = () => {
   const getButtonAction = () => {
     if (!isOtpSent) return handleSendOtp;
     if (!isEmailVerified) return handleVerifyOtpAndProceedToPayment;
+    // If email is verified, payment should have been initiated or is in progress
+    // No direct button action at this stage, button text/disabled state handles it
     return () => { };
   };
 
@@ -415,21 +426,27 @@ const RequestReferralPage = () => {
     if (isLoading) return "Processing...";
     if (!isOtpSent) return "Send OTP";
     if (!isEmailVerified) return "Verify OTP & Proceed to Pay";
-    return "Payment in Progress";
+    return "Payment in Progress"; // Default if email verified and payment initiated
   };
 
   const isButtonDisabled = () => {
     if (isLoading || paymentInProgress) return true;
-    if (isOtpSent && !isEmailVerified) {
+    if (isOtpSent && !isEmailVerified) { // When waiting to verify OTP
       const otpValue = form.getValues("otp");
-      if (!otpValue || otpValue.length !== 6) return true;
-
-      const { name, email, targetCompany, jobId, currentCompany, resume } = form.getValues();
-      if (!name || !email || !targetCompany || !jobId || !currentCompany || !resume || (resume instanceof FileList && resume.length === 0)) {
+      if (!otpValue || otpValue.length !== 6) return true; // Disable if OTP not 6 digits
+      
+      // Also ensure main fields are still valid before allowing OTP verification + payment
+      const { name, email, targetCompany, jobId, currentCompany, resume, agreeToTerms } = form.getValues();
+      if (!name || !email || !targetCompany || !jobId || !currentCompany || !agreeToTerms || !resume || (resume instanceof FileList && resume.length === 0)) {
         return true;
       }
     }
+    // Before sending OTP, disable if email is invalid or empty
     if (!isOtpSent && (form.getFieldState("email").invalid || !form.getValues("email"))) return true;
+    
+    // Add check for agreeToTerms before sending OTP as well
+    if (!isOtpSent && !form.getValues("agreeToTerms")) return true;
+
 
     return false;
   };
@@ -597,6 +614,32 @@ const RequestReferralPage = () => {
                         <Input type="file" accept=".pdf,.docx" onChange={(e: ChangeEvent<HTMLInputElement>) => { const files = e.target.files; if (files) { onChange(files); } }} {...rest} disabled={isLoading || isEmailVerified || paymentInProgress} />
                       </FormControl>
                       <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                 <FormField
+                  control={form.control}
+                  name="agreeToTerms"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border border-border p-4 shadow">
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                          disabled={isLoading || isEmailVerified || paymentInProgress}
+                        />
+                      </FormControl>
+                      <div className="space-y-1 leading-none">
+                        <FormLabel>
+                          I agree to the{' '}
+                          <Link href="/policy" passHref target="_blank" rel="noopener noreferrer">
+                            <span className="underline text-primary hover:text-primary/80 cursor-pointer">
+                              Terms and Conditions
+                            </span>
+                          </Link>
+                        </FormLabel>
+                        <FormMessage />
+                      </div>
                     </FormItem>
                   )}
                 />
