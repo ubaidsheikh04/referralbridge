@@ -48,7 +48,7 @@ const ReferrerSignupPage = () => {
     defaultValues: {
       companyEmail: "",
       personalEmail: "",
-      otp: "",
+      otp: undefined, // Changed from "" to undefined
       company: "",
       agreeToTerms: false,
     },
@@ -195,7 +195,7 @@ const ReferrerSignupPage = () => {
 
   const onSubmitHandler = async (values: ReferrerSignupFormValues) => {
     console.log("onSubmitHandler called with values:", values);
-    if (!values.agreeToTerms && !isVerificationSent) { // Check terms only before sending OTP
+    if (!values.agreeToTerms && !isVerificationSent) { 
         form.setError("agreeToTerms", { type: "manual", message: "You must agree to the terms to proceed." });
         toast({ variant: "destructive", title: "Terms and Conditions", description: "Please agree to the terms and conditions." });
         return;
@@ -211,35 +211,37 @@ const ReferrerSignupPage = () => {
   };
 
   const handleValidationErrors = (errors: FieldErrors<ReferrerSignupFormValues>) => {
-    let specificErrorHandled = false;
+    if (Object.keys(errors).length > 0) {
+      console.warn("Form validation detected. Errors object:", JSON.stringify(errors, null, 2)); 
+      let specificErrorHandled = false;
+      if (errors.companyEmail?.message) {
+        toast({ variant: "destructive", title: "Company Email Error", description: errors.companyEmail.message });
+        specificErrorHandled = true;
+      } else if (errors.personalEmail?.message) {
+        toast({ variant: "destructive", title: "Personal Email Error", description: errors.personalEmail.message });
+        specificErrorHandled = true;
+      } else if (errors.company?.message) {
+        toast({ variant: "destructive", title: "Company Name Error", description: errors.company.message });
+        specificErrorHandled = true;
+      } else if (errors.agreeToTerms?.message) {
+        toast({ variant: "destructive", title: "Terms Error", description: errors.agreeToTerms.message });
+        specificErrorHandled = true;
+      } else if (errors.otp?.message && isVerificationSent) { // Only show OTP error if OTP was sent
+        toast({ variant: "destructive", title: "OTP Error", description: errors.otp.message });
+        specificErrorHandled = true;
+      }
 
-    if (errors.companyEmail?.message) {
-      toast({ variant: "destructive", title: "Company Email Error", description: errors.companyEmail.message });
-      specificErrorHandled = true;
-    } else if (errors.personalEmail?.message) {
-      toast({ variant: "destructive", title: "Personal Email Error", description: errors.personalEmail.message });
-      specificErrorHandled = true;
-    } else if (errors.company?.message) {
-      toast({ variant: "destructive", title: "Company Name Error", description: errors.company.message });
-      specificErrorHandled = true;
-    } else if (errors.agreeToTerms?.message) {
-      toast({ variant: "destructive", title: "Terms Error", description: errors.agreeToTerms.message });
-      specificErrorHandled = true;
-    } else if (errors.otp?.message) { // Removed '&& isVerificationSent'
-      toast({ variant: "destructive", title: "OTP Error", description: errors.otp.message });
-      specificErrorHandled = true;
-    }
-
-
-    if (specificErrorHandled) {
-      console.warn("Form validation detected and handled with a specific toast. Errors:", JSON.stringify(errors, null, 2));
-    } else if (Object.keys(errors).length > 0) {
-      console.error("Unhandled Zod validation error or unexpected error structure. Errors:", JSON.stringify(errors, null, 2));
-      toast({
-        variant: "destructive",
-        title: "Validation Error",
-        description: "Please correct the highlighted errors in the form.",
-      });
+      if (specificErrorHandled) {
+        console.warn("Form validation detected and handled with a specific toast. Errors:", JSON.stringify(errors, null, 2));
+      } else if (Object.keys(errors).length > 0 && !(errors.otp && !isVerificationSent) ) { 
+        // If there are errors, but not one of the specific ones, and it's not an OTP error when OTP wasn't sent
+        console.error("Unhandled Zod validation error or unexpected error structure. Errors:", JSON.stringify(errors, null, 2));
+        toast({
+          variant: "destructive",
+          title: "Validation Error",
+          description: "Please correct the highlighted errors in the form.",
+        });
+      }
     } else {
       console.error("handleValidationErrors called by react-hook-form with an empty errors object. This is unexpected and may indicate an issue with form state or resolver configuration.");
       toast({
@@ -370,4 +372,6 @@ const ReferrerSignupPage = () => {
 };
 
 export default ReferrerSignupPage;
+    
+
     
