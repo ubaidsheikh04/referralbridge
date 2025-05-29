@@ -8,11 +8,13 @@ import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormItem, FormLabel, FormMessage, FormField } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "@/hooks/use-toast";
 import { useRouter } from 'next/navigation';
 import { auth, db } from '@/services/firebase'; // Import auth and db
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, type UserCredential } from "firebase/auth";
 import { doc, setDoc, serverTimestamp, getDoc } from "firebase/firestore";
+import Link from 'next/link';
 
 const formSchema = z.object({
   companyEmail: z.string().email({
@@ -26,6 +28,9 @@ const formSchema = z.object({
   otp: z.string().length(6, { message: "OTP must be 6 digits." }).optional(),
   company: z.string().min(2, {
     message: "Company name must be at least 2 characters.",
+  }),
+  agreeToTerms: z.boolean().refine(val => val === true, {
+    message: "You must agree to the terms and conditions to proceed."
   }),
 });
 
@@ -45,6 +50,7 @@ const ReferrerSignupPage = () => {
       personalEmail: "",
       otp: "",
       company: "",
+      agreeToTerms: false,
     },
     reValidateMode: 'onChange',
   });
@@ -118,11 +124,8 @@ const ReferrerSignupPage = () => {
 
     if (values.otp === generatedOtp) {
       toast({ title: "Personal Email Verified!", description: "Attempting to finalize signup..." });
-      // Primary verification is OTP on personal email.
-      // Now, create/sign-in Firebase user with personalEmail and a default/generated password.
-      // This step is for getting a Firebase UID and linking data.
       const firebaseUserEmail = values.personalEmail;
-      const defaultPassword = "defaultReferrerPassword123!"; // Use a strong, consistent default or generate one securely.
+      const defaultPassword = "defaultReferrerPassword123!"; 
 
       let userCredential: UserCredential | null = null;
       try {
@@ -153,10 +156,10 @@ const ReferrerSignupPage = () => {
         const user = userCredential.user;
         const referrerData = {
           uid: user.uid,
-          email: values.personalEmail, // Verified personal email
-          companyRegisteredEmail: values.companyEmail, // Company email provided
+          email: values.personalEmail, 
+          companyRegisteredEmail: values.companyEmail, 
           company: values.company,
-          isVerified: true, // Signifies personal email OTP verification
+          isVerified: true, 
           createdAt: serverTimestamp(),
           lastLogin: serverTimestamp()
         };
@@ -170,8 +173,8 @@ const ReferrerSignupPage = () => {
           console.log("Referrer details successfully written/merged to Firestore.");
 
           sessionStorage.setItem('company', values.company);
-          sessionStorage.setItem('referrerEmail', values.personalEmail); // Store verified personal email
-          sessionStorage.setItem('referrerUid', user.uid); // Store Firebase UID
+          sessionStorage.setItem('referrerEmail', values.personalEmail); 
+          sessionStorage.setItem('referrerUid', user.uid); 
           
           toast({ title: "Signup Successful!", description: "You have successfully signed up as a referrer." });
           router.push('/dashboard');
@@ -193,6 +196,11 @@ const ReferrerSignupPage = () => {
   const onSubmitHandler = async (values: ReferrerSignupFormValues) => {
     console.log("onSubmitHandler called with values:", values);
     if (!isVerificationSent) {
+      if (!values.agreeToTerms) {
+        form.setError("agreeToTerms", { type: "manual", message: "You must agree to the terms to proceed." });
+        toast({ variant: "destructive", title: "Terms and Conditions", description: "Please agree to the terms and conditions." });
+        return;
+      }
       console.log("Calling sendVerificationCode for personal email:", values.personalEmail);
       await sendVerificationCode(values.personalEmail);
     } else {
@@ -201,7 +209,7 @@ const ReferrerSignupPage = () => {
     }
   };
 
- const handleValidationErrors = (errors: FieldErrors<ReferrerSignupFormValues>) => {
+  const handleValidationErrors = (errors: FieldErrors<ReferrerSignupFormValues>) => {
     if (Object.keys(errors).length > 0) {
       console.error("Form validation detected. Errors object:", JSON.stringify(errors, null, 2)); 
       let toastShown = false;
@@ -214,7 +222,11 @@ const ReferrerSignupPage = () => {
       } else if (errors.company?.message) {
         toast({ variant: "destructive", title: "Company Name Error", description: errors.company.message });
         toastShown = true;
-      } else if (errors.otp?.message && isVerificationSent) { 
+      } else if (errors.agreeToTerms?.message) {
+        toast({ variant: "destructive", title: "Terms Error", description: errors.agreeToTerms.message });
+        toastShown = true;
+      }
+      else if (errors.otp?.message && isVerificationSent) { 
          toast({ variant: "destructive", title: "OTP Error", description: errors.otp.message });
          toastShown = true;
       }
@@ -229,11 +241,12 @@ const ReferrerSignupPage = () => {
       }
     } else {
       console.log("handleValidationErrors was called by react-hook-form, but the errors object was empty. This might indicate an issue not related to Zod field validation if submission is still blocked.");
-      toast({
-        variant: "destructive",
-        title: "Form Submission Issue",
-        description: "Could not process the form. Please ensure all fields are correctly filled and try again.",
-      });
+      // This block might not be strictly necessary if RHF always provides field-specific errors.
+      // toast({
+      //   variant: "destructive",
+      //   title: "Form Submission Issue",
+      //   description: "Could not process the form. Please ensure all fields are correctly filled and try again.",
+      // });
     }
   };
 
@@ -294,7 +307,33 @@ const ReferrerSignupPage = () => {
               </FormItem>
             )}
           />
-          {isVerificationSent && otpSentToEmail && ( // Check otpSentToEmail to ensure OTP was actually sent
+          {!isVerificationSent && (
+            <FormField
+              control={form.control}
+              name="agreeToTerms"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border border-border p-4 shadow">
+                  <FormControl>
+                    <Checkbox
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                      disabled={isLoading || isVerificationSent}
+                    />
+                  </FormControl>
+                  <div className="space-y-1 leading-none">
+                    <FormLabel>
+                      I agree to the{' '}
+                      <Link href="/policy" target="_blank" rel="noopener noreferrer" className="underline text-primary hover:text-primary/80 cursor-pointer">
+                        Terms and Conditions
+                      </Link>
+                    </FormLabel>
+                    <FormMessage />
+                  </div>
+                </FormItem>
+              )}
+            />
+          )}
+          {isVerificationSent && otpSentToEmail && ( 
             <FormField
               control={form.control}
               name="otp"
@@ -316,7 +355,7 @@ const ReferrerSignupPage = () => {
           )}
           <Button 
             type="submit" 
-            disabled={isLoading || (isVerificationSent && (!form.getValues("otp") || form.getValues("otp")?.length !== 6))}
+            disabled={isLoading || (isVerificationSent && (!form.getValues("otp") || form.getValues("otp")?.length !== 6)) || (!isVerificationSent && !form.watch("agreeToTerms"))}
           >
             {isLoading ? "Processing..." : (isVerificationSent ? "Verify OTP & Sign Up" : "Send OTP")}
           </Button>
