@@ -45,10 +45,15 @@ export function Combobox({
   disabled,
 }: ComboboxProps) {
   const [open, setOpen] = React.useState(false)
+  const [inputValue, setInputValue] = React.useState(value || "") // Local state for input
 
-  // Find the selected option based on the current value, case-insensitive
+  // Sync inputValue with the external value prop
+  React.useEffect(() => {
+    setInputValue(value || "")
+  }, [value])
+
   const selectedOption = options.find(
-    (option) => option.value?.toLowerCase() === value?.toLowerCase()
+    (option) => option.value?.toLowerCase() === inputValue?.toLowerCase()
   )
 
   return (
@@ -61,38 +66,43 @@ export function Combobox({
           className="w-full justify-between font-normal"
           disabled={disabled}
         >
-          {selectedOption ? selectedOption.label : (value || placeholder)}
+          {selectedOption ? selectedOption.label : (inputValue || placeholder)}
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
         <Command
-          // Optional: Custom filter if needed, though Command default filter is usually good.
-          // filter={(itemValue, search) => {
-          //   const option = options.find(opt => opt.value.toLowerCase() === itemValue.toLowerCase());
-          //   if (option?.label.toLowerCase().includes(search.toLowerCase())) return 1;
-          //   // if (itemValue.toLowerCase().includes(search.toLowerCase())) return 1; // If value itself should be searchable
-          //   return 0;
-          // }}
+          filter={(itemValue, search) => {
+            const option = options.find(opt => opt.value.toLowerCase() === itemValue.toLowerCase());
+            if (option?.label.toLowerCase().includes(search.toLowerCase())) return 1;
+            if (itemValue.toLowerCase().includes(search.toLowerCase())) return 1; 
+            return 0;
+          }}
         >
           <CommandInput
             placeholder={searchPlaceholder}
-            value={value} // Directly use and control RHF's field value
-            onValueChange={onChange} // Directly update RHF's field value on type
+            value={inputValue} 
+            onValueChange={(currentSearchValue) => {
+              setInputValue(currentSearchValue); // Update local input state
+              onChange(currentSearchValue); // Propagate change for free-form input
+            }}
           />
           <CommandList>
-            <CommandEmpty>{emptyResultText}</CommandEmpty>
+            <CommandEmpty>
+              {inputValue && !options.some(opt => opt.label.toLowerCase().includes(inputValue.toLowerCase())) 
+                ? `No results. Press Enter to add "${inputValue}"` 
+                : emptyResultText}
+            </CommandEmpty>
             <CommandGroup>
               {options.map((option) => (
                 <CommandItem
                   key={option.value}
-                  value={option.value} // This value is used by Command for filtering and onSelect
+                  value={option.value} 
                   onSelect={(currentValue) => {
-                    // currentValue is the 'value' prop of the CommandItem that was selected.
-                    // We ensure to pass the original casing from options if a match is found,
-                    // or the currentValue (which might be a newly typed value if Command allows it)
                     const matchedOption = options.find(opt => opt.value.toLowerCase() === currentValue.toLowerCase());
-                    onChange(matchedOption ? matchedOption.value : currentValue);
+                    const finalValue = matchedOption ? matchedOption.value : currentValue;
+                    setInputValue(finalValue); // Update local input state
+                    onChange(finalValue); // Propagate change
                     setOpen(false)
                   }}
                 >
