@@ -9,7 +9,7 @@ interface ReferralRequest {
     email: string;
     targetCompany: string;
     jobId: string;
-    currentCompany?: string; // Added currentCompany
+    currentCompany?: string;
     resumeUrl?: string;
     status?: 'pending' | 'referred' | 'rejected';
     viewCount?: number;
@@ -114,7 +114,7 @@ const ReferralRequestTile: React.FC<ReferralRequestTileProps> = ({ request, onVi
                         <p><strong>Email:</strong> {request.email}</p>
                         <p><strong>Target Company:</strong> {request.targetCompany}</p>
                         <p><strong>Job ID:</strong> {request.jobId}</p>
-                        {request.currentCompany && <p><strong>Current Company:</strong> {request.currentCompany}</p>}
+                        {viewMode !== 'referrer' && request.currentCompany && <p><strong>Current Company:</strong> {request.currentCompany}</p>}
                         
                         {viewMode === 'candidate' && request.resumeUrl && (
                              <p><strong>Resume:</strong> <a href={request.resumeUrl} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline" onClick={(e) => e.stopPropagation()}>View Resume</a></p>
