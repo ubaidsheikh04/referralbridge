@@ -9,14 +9,15 @@ interface ReferralRequest {
     email: string;
     targetCompany: string;
     jobId: string;
+    currentCompany?: string; // Added currentCompany
     resumeUrl?: string;
-    status?: 'pending' | 'referred' | 'rejected'; // Status is still relevant for candidate view
-    viewCount?: number; // Added viewCount
+    status?: 'pending' | 'referred' | 'rejected';
+    viewCount?: number;
 }
 
 interface ReferralRequestTileProps {
     request: ReferralRequest;
-    onViewAction?: (requestId: string) => Promise<void>; // Renamed from onRefer
+    onViewAction?: (requestId: string) => Promise<void>;
     viewMode?: 'referrer' | 'candidate';
 }
 
@@ -73,7 +74,6 @@ const ReferralRequestTile: React.FC<ReferralRequestTileProps> = ({ request, onVi
     };
     
     const getStatusColor = (status?: string) => {
-        // This function remains as candidates still see their status
         switch (status) {
             case 'referred': return 'text-green-500';
             case 'rejected': return 'text-red-500';
@@ -112,8 +112,9 @@ const ReferralRequestTile: React.FC<ReferralRequestTileProps> = ({ request, onVi
                 {isExpanded && (
                     <div className="mt-2 space-y-1 text-sm text-card-foreground">
                         <p><strong>Email:</strong> {request.email}</p>
-                        <p><strong>Company:</strong> {request.targetCompany}</p>
+                        <p><strong>Target Company:</strong> {request.targetCompany}</p>
                         <p><strong>Job ID:</strong> {request.jobId}</p>
+                        {request.currentCompany && <p><strong>Current Company:</strong> {request.currentCompany}</p>}
                         
                         {viewMode === 'candidate' && request.resumeUrl && (
                              <p><strong>Resume:</strong> <a href={request.resumeUrl} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline" onClick={(e) => e.stopPropagation()}>View Resume</a></p>
@@ -142,7 +143,6 @@ const ReferralRequestTile: React.FC<ReferralRequestTileProps> = ({ request, onVi
                                     <p className="text-muted-foreground text-xs">No resume submitted by candidate.</p>
                                 )}
                                 <p className="text-xs text-muted-foreground">Viewed by {request.viewCount || 0} referrer(s).</p>
-                                {/* Removed "This candidate has been marked as referred." */}
                             </div>
                         )}
                     </div>

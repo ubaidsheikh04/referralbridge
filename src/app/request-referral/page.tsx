@@ -10,8 +10,8 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
 import { uploadFile } from "@/services/file-upload";
-import { addDoc, collection, getDocs, query, where, getFirestore } from "firebase/firestore";
-import { firebaseApp, db } from "@/services/firebase";
+import { addDoc, collection, serverTimestamp } from "firebase/firestore"; // Added serverTimestamp
+import { db } from "@/services/firebase"; // Ensure db is correctly imported
 import { useRouter } from 'next/navigation';
 import Script from 'next/script';
 import ReferralRequestTile from '@/components/ReferralRequestTile';
@@ -21,6 +21,7 @@ const formSchema = z.object({
   email: z.string().email({ message: "Invalid email address." }),
   targetCompany: z.string().min(2, { message: "Company name must be at least 2 characters." }),
   jobId: z.string().min(1, { message: "Job ID/Referral ID cannot be empty." }).describe("Check details in job openings"),
+  currentCompany: z.string().min(1, { message: "Current company, 'Fresher', or 'N/A' is required." }),
   resume: z.any().refine(
     (files) => typeof window === 'undefined' || (files instanceof FileList && files?.length === 1 && ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'].includes(files[0].type)),
     "Resume (PDF or DOCX) is required."
@@ -36,9 +37,11 @@ interface ReferralRequestData {
   email: string;
   targetCompany: string;
   jobId: string;
+  currentCompany: string;
   resumeUrl?: string;
   status?: 'pending' | 'referred' | 'rejected';
   paymentStatus?: string;
+  viewCount?: number;
 }
 
 type PageView = 'form' | 'emailPrompt' | 'requestsDisplay';
@@ -64,26 +67,26 @@ const RequestReferralPage = () => {
       email: "",
       targetCompany: "",
       jobId: "",
+      currentCompany: "",
       resume: undefined,
       otp: "",
     },
   });
 
   const sendOtpEmailApi = async (email: string, otp: string, subject?: string, htmlBody?: string) => {
-    // This function now only handles the API call and error toasting for that call.
-    // isLoading state for the overall user action is managed by the caller.
     try {
       const response = await fetch('/api/send-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          to: email, 
-          subject: subject || 'Your OTP for ReferralBridge', 
-          htmlBody: htmlBody || `<p>Your OTP for ReferralBridge is: <strong>${otp}</strong></p>` 
+        body: JSON.stringify({
+          to: email,
+          subject: subject || 'Your OTP for ReferralBridge',
+          htmlBody: htmlBody || `<p>Your OTP for ReferralBridge is: <strong>${otp}</strong></p>`
         }),
       });
       if (!response.ok) {
         const errorData = await response.json();
+        console.error("sendOtpEmailApi failed with:", errorData);
         throw new Error(errorData.error || 'Failed to send OTP email');
       }
       return true;
@@ -95,41 +98,37 @@ const RequestReferralPage = () => {
   };
 
   const handleSendOtp = async () => {
-    setIsLoading(true); // Manage loading for the whole "send OTP" user action
-
-    // Trigger validation for all fields that should be filled before OTP can be sent
-    const preOtpFieldsValid = await form.trigger(["name", "email", "targetCompany", "jobId", "resume"]);
+    setIsLoading(true);
+    const preOtpFieldsValid = await form.trigger(["name", "email", "targetCompany", "jobId", "currentCompany", "resume"]);
 
     if (!preOtpFieldsValid) {
-        toast({
-            variant: "destructive",
-            title: "Missing Information",
-            description: "Please fill in all required fields correctly before sending an OTP.",
-        });
-        setIsLoading(false); 
-        return; // Stop if pre-OTP fields are not valid
+      toast({
+        variant: "destructive",
+        title: "Missing Information",
+        description: "Please fill in all required fields correctly before sending an OTP.",
+      });
+      setIsLoading(false);
+      return;
     }
-    
-    const email = form.getValues("email"); // Email should be valid at this point
+
+    const email = form.getValues("email");
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     setGeneratedOtp(otp);
-    
-    const emailSent = await sendOtpEmailApi(email, otp); 
+
+    const emailSent = await sendOtpEmailApi(email, otp);
 
     if (emailSent) {
-        setIsOtpSent(true);
-        toast({ title: "OTP Sent!", description: "Please check your email for the OTP." });
+      setIsOtpSent(true);
+      toast({ title: "OTP Sent!", description: "Please check your email for the OTP." });
     }
-    // If emailSent is false, sendOtpEmailApi has already shown a toast.
-    
-    setIsLoading(false); // Ensure loading is false at the end of the operation
+    setIsLoading(false);
   };
 
 
   const handleVerifyOtpAndProceedToPayment = async () => {
     setIsLoading(true);
     const otpValue = form.getValues("otp");
-    const formData = form.getValues(); // get all current form values
+    const formData = form.getValues();
 
     if (!generatedOtp) {
       toast({ variant: "destructive", title: "Error", description: "OTP not generated. Please request OTP first." });
@@ -137,21 +136,20 @@ const RequestReferralPage = () => {
       return;
     }
 
-    // Ensure all necessary form data for payment/submission is present
-    const { name, email, targetCompany, jobId, resume } = formData;
-    if (!name || !email || !targetCompany || !jobId || !(resume instanceof FileList && resume.length > 0)) {
-        toast({ variant: "destructive", title: "Missing Information", description: "Please ensure all form fields are filled before proceeding." });
-        form.trigger(["name", "email", "targetCompany", "jobId", "resume"]); // Show errors on fields
-        setIsLoading(false);
-        return;
+    const { name, email, targetCompany, jobId, currentCompany, resume } = formData;
+    if (!name || !email || !targetCompany || !jobId || !currentCompany || !(resume instanceof FileList && resume.length > 0)) {
+      toast({ variant: "destructive", title: "Missing Information", description: "Please ensure all form fields are filled before proceeding." });
+      form.trigger(["name", "email", "targetCompany", "jobId", "currentCompany", "resume"]);
+      setIsLoading(false);
+      return;
     }
-    
-    setCurrentReferralData(formData); // Store validated form data before initiating payment
+
+    setCurrentReferralData(formData);
 
     if (otpValue === generatedOtp) {
-      setIsEmailVerified(true); // Mark email as verified
+      setIsEmailVerified(true);
       toast({ title: "Email Verified!", description: "Proceeding to payment..." });
-      await createRazorpayOrder(formData); // Pass the validated form data
+      await createRazorpayOrder(formData);
     } else {
       form.setError("otp", { type: "manual", message: "Invalid OTP." });
       toast({ variant: "destructive", title: "Error", description: "Invalid OTP. Please try again." });
@@ -161,28 +159,27 @@ const RequestReferralPage = () => {
 
   const createRazorpayOrder = async (referralData: ReferralFormValues) => {
     setPaymentInProgress(true);
-    // setIsLoading(true) is already set by the caller (handleVerifyOtpAndProceedToPayment)
 
-    if (!referralData.name || !referralData.email || !referralData.targetCompany || !referralData.jobId) {
-        toast({ variant: 'destructive', title: 'Error', description: 'All fields are required before payment.' });
-        setIsLoading(false);
-        setPaymentInProgress(false);
-        return;
+    if (!referralData.name || !referralData.email || !referralData.targetCompany || !referralData.jobId || !referralData.currentCompany) {
+      toast({ variant: 'destructive', title: 'Error', description: 'All fields are required before payment.' });
+      setIsLoading(false);
+      setPaymentInProgress(false);
+      return;
     }
 
     const resumeFiles = referralData.resume;
     if (typeof window === 'undefined' || !(resumeFiles instanceof FileList && resumeFiles.length === 1 && resumeFiles[0].size > 0)) {
-        toast({ variant: 'destructive', title: 'Error', description: 'Please select a valid resume file.' });
-        setIsLoading(false);
-        setPaymentInProgress(false);
-        return;
+      toast({ variant: 'destructive', title: 'Error', description: 'Please select a valid resume file.' });
+      setIsLoading(false);
+      setPaymentInProgress(false);
+      return;
     }
 
     try {
       const response = await fetch('/api/razorpay/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount: 10000 }), // amount in paise (100 INR)
+        body: JSON.stringify({ amount: 10000 }),
       });
 
       if (!response.ok) {
@@ -190,9 +187,9 @@ const RequestReferralPage = () => {
         console.error("Error creating Razorpay order. Server response:", errorText);
         let errorData = { error: `Failed to create Razorpay order. Status: ${response.status}` };
         try {
-            errorData = JSON.parse(errorText || "{}");
+          errorData = JSON.parse(errorText || "{}");
         } catch (parseError) {
-            console.warn("Could not parse error response from create-order as JSON", parseError);
+          console.warn("Could not parse error response from create-order as JSON", parseError);
         }
         throw new Error(errorData.error || `Failed to create Razorpay order. Status: ${response.status}`);
       }
@@ -201,43 +198,43 @@ const RequestReferralPage = () => {
       if (!data.orderId || !data.keyId) {
         throw new Error("Received invalid order data from server.");
       }
-      handleRazorpayPayment(data.keyId, data.orderId, referralData); // Pass referralData
+      handleRazorpayPayment(data.keyId, data.orderId, referralData);
     } catch (error: any) {
       console.error('Error creating Razorpay order:', error);
       toast({ variant: 'destructive', title: 'Payment Error', description: error.message || 'Failed to create payment order.' });
-      setIsEmailVerified(false); // Reset email verification status on payment error
+      setIsEmailVerified(false);
       setIsLoading(false);
       setPaymentInProgress(false);
     }
   };
 
-  const handleRazorpayPayment = (keyId: string, orderId: string, referralDataOnPayment: ReferralFormValues) => {
-     if (!referralDataOnPayment) { // Check parameter directly
-        console.error("Referral data (referralDataOnPayment parameter) is null in handlePayment at the start of Razorpay options");
-        toast({ variant: "destructive", title: "Error", description: "Critical: Form data is missing. Cannot proceed with payment." });
-        setIsLoading(false); // Ensure loading is stopped
-        setPaymentInProgress(false);
-        return;
+  const handleRazorpayPayment = (keyId: string, orderId: string, referralDataOnPayment: ReferralFormValues | null) => {
+    if (!referralDataOnPayment) {
+      console.error("Referral data (referralDataOnPayment parameter) is null in handlePayment at the start of Razorpay options");
+      toast({ variant: "destructive", title: "Error", description: "Critical: Form data is missing. Cannot proceed with payment." });
+      setIsLoading(false);
+      setPaymentInProgress(false);
+      return;
     }
 
     const options = {
       key: keyId,
-      amount: 10000, // Amount in paise
+      amount: 10000,
       currency: "INR",
       name: "ReferralBridge",
       description: "Referral Request Fee",
       order_id: orderId,
       handler: async function (response: any) {
-        setPaymentInProgress(true); 
+        setPaymentInProgress(true);
 
-        if (!referralDataOnPayment) { 
-            console.error("Critical: referralDataOnPayment is null in payment handler callback.");
-            toast({ variant: "destructive", title: "Error", description: "Session data lost. Cannot save referral." });
-            setIsLoading(false);
-            setPaymentInProgress(false);
-            return;
+        if (!referralDataOnPayment) {
+          console.error("Critical: referralDataOnPayment is null in payment handler callback.");
+          toast({ variant: "destructive", title: "Error", description: "Session data lost. Cannot save referral." });
+          setIsLoading(false);
+          setPaymentInProgress(false);
+          return;
         }
-        
+
         try {
           const verificationResponse = await fetch('/api/razorpay/verify-payment', {
             method: 'POST',
@@ -251,42 +248,43 @@ const RequestReferralPage = () => {
 
           if (!verificationResponse.ok) {
             const errorText = await verificationResponse.text();
-            console.error("Payment verification failed. Server response:", errorText);
             let errorData = { error: `Payment verification failed. Status: ${verificationResponse.status}` };
             try { errorData = JSON.parse(errorText || "{}"); } catch (parseError) { console.warn("Could not parse error response from verify-payment as JSON", parseError); }
             throw new Error(errorData.error || `Payment verification failed. Status: ${verificationResponse.status}`);
           }
-          
+
           toast({ title: "Payment Successful!", description: "Verifying and saving your request..." });
 
           let uploadedResumeUrl = '';
-          const resumeFiles = referralDataOnPayment.resume; 
+          const resumeFiles = referralDataOnPayment.resume;
           if (resumeFiles instanceof FileList && resumeFiles.length === 1) {
             try {
               uploadedResumeUrl = await uploadFile(resumeFiles[0]);
             } catch (uploadError: any) {
               console.error("Error uploading resume after payment:", uploadError);
               toast({ variant: "destructive", title: "File Upload Error", description: `Your payment was successful, but resume upload failed: ${uploadError.message}. Please contact support.` });
+              // Continue to save the request even if resume upload fails, but without resumeUrl
             }
           } else {
             console.warn("Resume file was not in the expected format after payment verification.");
           }
-        
-          if (referralDataOnPayment.name && referralDataOnPayment.email && referralDataOnPayment.targetCompany && referralDataOnPayment.jobId) {
+
+          if (referralDataOnPayment.name && referralDataOnPayment.email && referralDataOnPayment.targetCompany && referralDataOnPayment.jobId && referralDataOnPayment.currentCompany) {
             await addDoc(collection(db, 'referralRequests'), {
               name: referralDataOnPayment.name,
               email: referralDataOnPayment.email,
               targetCompany: referralDataOnPayment.targetCompany,
               jobId: referralDataOnPayment.jobId,
+              currentCompany: referralDataOnPayment.currentCompany,
               resumeUrl: uploadedResumeUrl,
               paymentId: response.razorpay_payment_id,
               orderId: response.razorpay_order_id,
               paymentStatus: 'paid',
-              status: 'pending', 
-              timestamp: new Date(),
+              status: 'pending',
+              timestamp: serverTimestamp(), // Use serverTimestamp
+              viewCount: 0,
             });
 
-            // Send submission confirmation email
             try {
               const subject = `Your Referral Request for ${referralDataOnPayment.jobId} has been submitted!`;
               const htmlBody = `
@@ -296,19 +294,17 @@ const RequestReferralPage = () => {
                 Best regards,<br>
                 The ReferralBridge Team
               `;
-              await sendOtpEmailApi(referralDataOnPayment.email, '', subject, htmlBody); // OTP not needed here, just subject & body
+              await sendOtpEmailApi(referralDataOnPayment.email, '', subject, htmlBody);
               console.log(`Submission confirmation email sent to ${referralDataOnPayment.email}`);
             } catch (emailError: any) {
               console.error("Failed to send submission confirmation email:", emailError.message);
-              // Don't block user flow if email fails, just log it.
             }
-
 
             toast({ title: "Referral Submitted!", description: "Your referral request has been successfully submitted." });
             sessionStorage.setItem('candidateViewEmail', referralDataOnPayment.email);
             router.push('/thank-you');
           } else {
-            toast({ variant: "destructive", title: "Data Error", description: "Key form data was missing. Request not saved."});
+            toast({ variant: "destructive", title: "Data Error", description: "Key form data was missing. Request not saved." });
           }
         } catch (error: any) {
           console.error("Error processing payment or saving data:", error);
@@ -327,33 +323,34 @@ const RequestReferralPage = () => {
         email: referralDataOnPayment.email,
         targetCompany: referralDataOnPayment.targetCompany,
         jobId: referralDataOnPayment.jobId,
+        currentCompany: referralDataOnPayment.currentCompany,
       },
       theme: {
-        color: "#FDB813" 
+        color: "#FDB813"
       },
       modal: {
-        ondismiss: function() {
+        ondismiss: function () {
           toast({ variant: "default", title: "Payment Cancelled", description: "Your payment was not completed." });
           setIsLoading(false);
           setPaymentInProgress(false);
-          setIsEmailVerified(false); 
+          setIsEmailVerified(false);
         }
       }
     };
 
     if (typeof window !== 'undefined' && (window as any).Razorpay) {
-        const rzp = new (window as any).Razorpay(options);
-        rzp.on('payment.failed', function (response: any) {
-            toast({ variant: "destructive", title: "Payment Failed", description: response.error.description || 'Payment failed.' });
-            setIsLoading(false);
-            setPaymentInProgress(false);
-            setIsEmailVerified(false); 
-        });
-        rzp.open();
-    } else {
-        toast({ variant: "destructive", title: "Error", description: "Payment gateway not loaded. Please refresh." });
+      const rzp = new (window as any).Razorpay(options);
+      rzp.on('payment.failed', function (response: any) {
+        toast({ variant: "destructive", title: "Payment Failed", description: response.error.description || 'Payment failed.' });
         setIsLoading(false);
         setPaymentInProgress(false);
+        setIsEmailVerified(false);
+      });
+      rzp.open();
+    } else {
+      toast({ variant: "destructive", title: "Error", description: "Payment gateway not loaded. Please refresh." });
+      setIsLoading(false);
+      setPaymentInProgress(false);
     }
   };
 
@@ -367,16 +364,16 @@ const RequestReferralPage = () => {
       return;
     }
     if (existingScript) {
-        existingScript.addEventListener('load', () => {
-            if ((window as any).Razorpay) {
-                callback?.();
-            } else {
-                toast({ variant: 'destructive', title: 'Error', description: 'Payment gateway failed to initialize. Please refresh.' });
-                setIsLoading(false);
-                setPaymentInProgress(false);
-            }
-        });
-        return;
+      existingScript.addEventListener('load', () => {
+        if ((window as any).Razorpay) {
+          callback?.();
+        } else {
+          toast({ variant: 'destructive', title: 'Error', description: 'Payment gateway failed to initialize. Please refresh.' });
+          setIsLoading(false);
+          setPaymentInProgress(false);
+        }
+      });
+      return;
     }
 
     const script = document.createElement('script');
@@ -409,31 +406,31 @@ const RequestReferralPage = () => {
   const getButtonAction = () => {
     if (!isOtpSent) return handleSendOtp;
     if (!isEmailVerified) return handleVerifyOtpAndProceedToPayment;
-    return () => {}; 
+    return () => { };
   };
 
   const getButtonText = () => {
     if (isLoading && !paymentInProgress && isOtpSent && !isEmailVerified) return "Verifying OTP & Initializing Payment...";
-    if (isLoading && paymentInProgress) return "Processing Payment..."; 
-    if (isLoading) return "Processing..."; 
+    if (isLoading && paymentInProgress) return "Processing Payment...";
+    if (isLoading) return "Processing...";
     if (!isOtpSent) return "Send OTP";
     if (!isEmailVerified) return "Verify OTP & Proceed to Pay";
-    return "Payment in Progress"; 
+    return "Payment in Progress";
   };
-  
+
   const isButtonDisabled = () => {
-    if (isLoading || paymentInProgress) return true; 
-    if (isOtpSent && !isEmailVerified) { 
+    if (isLoading || paymentInProgress) return true;
+    if (isOtpSent && !isEmailVerified) {
       const otpValue = form.getValues("otp");
       if (!otpValue || otpValue.length !== 6) return true;
-      
-      const { name, email, targetCompany, jobId, resume } = form.getValues();
-      if (!name || !email || !targetCompany || !jobId || !resume || (resume instanceof FileList && resume.length === 0)) {
-        return true; 
+
+      const { name, email, targetCompany, jobId, currentCompany, resume } = form.getValues();
+      if (!name || !email || !targetCompany || !jobId || !currentCompany || !resume || (resume instanceof FileList && resume.length === 0)) {
+        return true;
       }
     }
-    if (!isOtpSent && (form.getFieldState("email").invalid || !form.getValues("email")) ) return true; // Disable if email invalid or empty for Send OTP
-    
+    if (!isOtpSent && (form.getFieldState("email").invalid || !form.getValues("email"))) return true;
+
     return false;
   };
 
@@ -578,6 +575,20 @@ const RequestReferralPage = () => {
                 />
                 <FormField
                   control={form.control}
+                  name="currentCompany"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Current Company (or 'Fresher'/'N/A')</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Your current company, or 'Fresher', 'N/A'" {...field} disabled={isLoading || isEmailVerified || paymentInProgress} />
+                      </FormControl>
+                      <FormDescription>Enter your current company, or type 'Fresher' or 'Not Applicable'.</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
                   name="resume"
                   render={({ field: { onChange, value, ...rest } }) => (
                     <FormItem>
@@ -627,4 +638,3 @@ const RequestReferralPage = () => {
 };
 
 export default RequestReferralPage;
-
