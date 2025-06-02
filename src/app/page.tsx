@@ -2,7 +2,7 @@
 "use client";
 
 import Link from 'next/link';
-import { Rocket, FileText } from 'lucide-react'; // Added FileText for policy link
+import { Rocket, FileText, Users } from 'lucide-react'; // Added FileText for policy link, Users for connections
 import { useEffect, useState } from 'react';
 
 export default function Home() {
@@ -21,7 +21,7 @@ export default function Home() {
         <p className="text-foreground text-lg mb-10 px-4 md:px-0">
           Welcome to ReferralBridge, your platform for seamless referrals.
         </p>
-        <div className="flex flex-col sm:flex-row justify-center space-y-4 sm:space-y-0 sm:space-x-4 mb-12">
+        <div className="flex flex-col sm:flex-row justify-center space-y-4 sm:space-y-0 sm:space-x-4 mb-6">
           <Link
             href="/request-referral"
             className="bg-accent text-accent-foreground hover:bg-accent/80 px-6 py-3 rounded-full font-medium transition-colors duration-300 shadow-md transform hover:-translate-y-1"
@@ -33,6 +33,15 @@ export default function Home() {
             className="bg-accent text-accent-foreground hover:bg-accent/80 px-6 py-3 rounded-full font-medium transition-colors duration-300 shadow-md transform hover:-translate-y-1"
           >
             I want to refer someone
+          </Link>
+        </div>
+        <div className="mt-8 mb-12">
+          <Link
+            href="/connections"
+            className="text-primary hover:text-primary/80 font-medium transition-colors duration-300 flex items-center justify-center group"
+          >
+            <Users className="h-5 w-5 mr-2 group-hover:animate-button-pop" />
+            Our Connections
           </Link>
         </div>
         <div className="absolute bottom-0 left-0 w-full h-32 bg-gradient-to-t from-secondary to-transparent"></div>
