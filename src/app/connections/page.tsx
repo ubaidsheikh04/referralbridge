@@ -45,10 +45,10 @@ const ConnectionsPage = () => {
           Our referral connections work at the companies listed below.
         </p>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-4">
+        <div className="space-y-3">
           {companies.map((company, index) => (
-            <div key={index} className="bg-card p-4 rounded-lg shadow-md border border-border hover:border-primary transition-colors duration-200">
-              <p className="text-card-foreground text-center font-medium">{company}</p>
+            <div key={index} className="border-b border-border pb-2">
+              <p className="text-card-foreground text-lg">{company}</p>
             </div>
           ))}
         </div>
