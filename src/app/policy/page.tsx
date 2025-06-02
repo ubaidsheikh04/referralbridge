@@ -17,7 +17,7 @@ const PolicyPage = () => {
         </Link>
 
         <h1 className="text-3xl md:text-4xl font-bold text-primary mb-4">ReferralBridge – Terms and Conditions of Use</h1>
-        <p className="text-sm text-muted-foreground mb-6">Effective Date: [Insert Date]</p>
+        <p className="text-sm text-muted-foreground mb-6">Effective Date: May 2025</p>
 
         <div className="space-y-6 text-muted-foreground prose prose-sm sm:prose-base prose-neutral dark:prose-invert max-w-none">
           <p>Welcome to ReferralBridge. These Terms and Conditions (“Terms”) constitute a legally binding agreement between you (“User”, “you”, “your”) and ReferralBridge (“ReferralBridge”, “we”, “our”, “us”), a neutral third-party platform designed to connect individuals seeking job referrals (“Requesters”) with professionals offering referrals (“Referrers”).</p>
@@ -171,7 +171,7 @@ const PolicyPage = () => {
 
           <section>
             <h2 className="text-2xl font-semibold text-foreground mt-6 mb-3">14. Governing Law and Jurisdiction</h2>
-            <p>These Terms are governed by and construed in accordance with the laws of the Republic of India (or your applicable jurisdiction). Any disputes arising out of or related to these Terms shall be subject to the exclusive jurisdiction of the courts located in [Insert City/State].</p>
+            <p>These Terms are governed by and construed in accordance with the laws of the Republic of India (or your applicable jurisdiction). Any disputes arising out of or related to these Terms shall be subject to the exclusive jurisdiction of the courts located in Kolhapur.</p>
           </section>
 
           <section>
