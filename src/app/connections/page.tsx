@@ -52,6 +52,9 @@ const ConnectionsPage = () => {
             </div>
           ))}
         </div>
+        <p className="text-center text-muted-foreground mt-6 text-sm">
+          ...and more
+        </p>
       </div>
     </div>
   );
