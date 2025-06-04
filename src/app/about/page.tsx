@@ -22,7 +22,7 @@ const AboutPage = () => {
             About ReferralBridge
           </h1>
           <p className="text-lg text-muted-foreground mb-6">
-            Connecting Talent to Opportunities — One Referral at a Time
+            Connecting Talent to Opportunities
           </p>
           <p className="text-foreground mb-4">
             ReferralBridge is a modern, secure, and efficient job referral platform that connects job seekers with employees at top companies who are open to providing genuine referrals. Our mission is simple yet powerful: to break down barriers to employment by making referrals more accessible, trusted, and trackable.
@@ -64,7 +64,7 @@ const AboutPage = () => {
 
           <h2 className="text-2xl font-semibold text-primary mt-8 mb-3">🔒 Security and Trust First</h2>
           <p className="text-foreground mb-4">
-            At ReferralBridge, we take your privacy seriously. All data is securely stored, and referrers retain full control over whom they choose to help. We never sell your data or share your profile without your consent.
+            At ReferralBridge, we take your privacy seriously. All data is securely stored, and referrers retain full control over whom they choose to help.
           </p>
 
           <h2 className="text-2xl font-semibold text-primary mt-8 mb-3">💡 Our Vision</h2>
