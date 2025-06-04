@@ -236,7 +236,6 @@ const ReferrerSignupPage = () => {
 
   const handleValidationErrors = (errors: FieldErrors<ReferrerSignupFormValues>) => {
     if (Object.keys(errors).length > 0) {
-      console.warn("Form validation detected. Errors object:", JSON.stringify(errors, null, 2)); 
       let specificErrorHandled = false;
       if (errors.companyEmail?.message) {
         toast({ variant: "destructive", title: "Company Email Error", description: errors.companyEmail.message });
@@ -250,7 +249,7 @@ const ReferrerSignupPage = () => {
       } else if (errors.agreeToTerms?.message) {
         toast({ variant: "destructive", title: "Terms Error", description: errors.agreeToTerms.message });
         specificErrorHandled = true;
-      } else if (errors.otp?.message && isVerificationSent) { 
+      } else if (errors.otp?.message && isVerificationSent) { // Only show OTP error toast if verification was sent
         toast({ variant: "destructive", title: "OTP Error", description: errors.otp.message });
         specificErrorHandled = true;
       }
@@ -302,7 +301,7 @@ const ReferrerSignupPage = () => {
             name="personalEmail"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Personal Email (for OTP)</FormLabel>
+                <FormLabel>Personal Email</FormLabel>
                 <FormControl>
                   <Input
                     placeholder="Enter your personal email (e.g., user@gmail.com)"
@@ -398,4 +397,6 @@ const ReferrerSignupPage = () => {
 };
 
 export default ReferrerSignupPage;
+    
+
     
