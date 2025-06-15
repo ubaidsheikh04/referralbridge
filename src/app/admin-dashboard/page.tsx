@@ -6,9 +6,12 @@ import { useRouter } from 'next/navigation';
 import { db } from '@/services/firebase';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { BarChart, PieChart, Users, FileText, Eye, Hourglass, CheckCircle, XCircle, LogOut } from 'lucide-react';
+import { BarChart, PieChart, Users, FileText, Eye, Hourglass, CheckCircle, XCircle, LogOut, FilterX } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from "@/components/ui/chart";
 import { Bar, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
@@ -38,12 +41,18 @@ interface Referrer {
   createdAt?: any;
 }
 
+type RequestStatus = 'pending' | 'referred' | 'rejected' | '';
+
+
 const AdminDashboardPage = () => {
   const router = useRouter();
   const [isAdmin, setIsAdmin] = useState(false);
   const [referralRequests, setReferralRequests] = useState<ReferralRequest[]>([]);
   const [referrers, setReferrers] = useState<Referrer[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  const [filterTargetCompany, setFilterTargetCompany] = useState('');
+  const [filterStatus, setFilterStatus] = useState<RequestStatus>('');
 
   useEffect(() => {
     const loggedIn = sessionStorage.getItem('isAdminLoggedIn');
@@ -85,14 +94,16 @@ const AdminDashboardPage = () => {
   }, [referralRequests]);
 
   const requestsByStatus = useMemo(() => {
-    const counts = { pending: 0, referred: 0, rejected: 0 };
+    const counts: { pending: number; referred: number; rejected: number; [key: string]: number } = { pending: 0, referred: 0, rejected: 0 };
     referralRequests.forEach(req => {
-      if (req.status) counts[req.status]++;
+      if (req.status && counts.hasOwnProperty(req.status)) {
+        counts[req.status]++;
+      }
     });
     return [
-      { name: 'Pending', value: counts.pending, fill: 'var(--color-pending)' },
-      { name: 'Referred', value: counts.referred, fill: 'var(--color-referred)' },
-      { name: 'Rejected', value: counts.rejected, fill: 'var(--color-rejected)' },
+      { name: 'Pending', value: counts.pending, fill: 'hsl(var(--chart-1))' },
+      { name: 'Referred', value: counts.referred, fill: 'hsl(var(--chart-2))' },
+      { name: 'Rejected', value: counts.rejected, fill: 'hsl(var(--chart-3))' },
     ].filter(item => item.value > 0);
   }, [referralRequests]);
 
@@ -102,13 +113,25 @@ const AdminDashboardPage = () => {
     rejected: { label: "Rejected", color: "hsl(var(--chart-3))" },
   } satisfies ChartConfig;
 
+  const filteredReferralRequests = useMemo(() => {
+    return referralRequests.filter(req => {
+      const companyMatch = filterTargetCompany ? req.targetCompany.toLowerCase().includes(filterTargetCompany.toLowerCase()) : true;
+      const statusMatch = filterStatus ? req.status === filterStatus : true;
+      return companyMatch && statusMatch;
+    });
+  }, [referralRequests, filterTargetCompany, filterStatus]);
 
   const handleLogout = () => {
     sessionStorage.removeItem('isAdminLoggedIn');
     router.replace('/admin-login');
   };
 
-  if (!isAdmin && isLoading) { // Check if not admin AND still loading (initial state before useEffect runs)
+  const clearFilters = () => {
+    setFilterTargetCompany('');
+    setFilterStatus('');
+  };
+
+  if (!isAdmin && isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-secondary">
         <Skeleton className="h-12 w-12 rounded-full" />
@@ -116,7 +139,7 @@ const AdminDashboardPage = () => {
       </div>
     );
   }
-  if (!isAdmin && !isLoading) { // Not admin and finished loading check (means redirect should have happened)
+  if (!isAdmin && !isLoading) {
      return (
         <div className="min-h-screen flex flex-col items-center justify-center bg-secondary p-4">
             <p className="text-xl text-foreground mb-4">Redirecting to login...</p>
@@ -225,6 +248,36 @@ const AdminDashboardPage = () => {
               <CardTitle>All Referral Requests</CardTitle>
             </CardHeader>
             <CardContent>
+              <div className="flex flex-col sm:flex-row gap-4 mb-4 items-end">
+                <div className="flex-1 min-w-[150px]">
+                  <Label htmlFor="filterCompany" className="text-sm">Filter by Target Company</Label>
+                  <Input
+                    id="filterCompany"
+                    placeholder="Enter company name..."
+                    value={filterTargetCompany}
+                    onChange={(e) => setFilterTargetCompany(e.target.value)}
+                    className="mt-1"
+                  />
+                </div>
+                <div className="flex-1 min-w-[150px]">
+                  <Label htmlFor="filterStatus" className="text-sm">Filter by Status</Label>
+                  <Select value={filterStatus} onValueChange={(value) => setFilterStatus(value as RequestStatus)}>
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder="Select status..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">All Statuses</SelectItem>
+                      <SelectItem value="pending">Pending</SelectItem>
+                      <SelectItem value="referred">Referred</SelectItem>
+                      <SelectItem value="rejected">Rejected</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button onClick={clearFilters} variant="outline" className="sm:ml-auto">
+                  <FilterX className="mr-2 h-4 w-4" /> Clear Filters
+                </Button>
+              </div>
+
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -237,7 +290,7 @@ const AdminDashboardPage = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {referralRequests.map((req) => (
+                  {filteredReferralRequests.map((req) => (
                     <TableRow key={req.id}>
                       <TableCell className="font-medium">{req.name}</TableCell>
                       <TableCell>{req.email}</TableCell>
@@ -245,9 +298,10 @@ const AdminDashboardPage = () => {
                       <TableCell>{req.jobId}</TableCell>
                       <TableCell>
                         <span className={`px-2 py-1 text-xs rounded-full ${
-                          req.status === 'pending' ? 'bg-yellow-500/20 text-yellow-700' :
-                          req.status === 'referred' ? 'bg-green-500/20 text-green-700' :
-                          req.status === 'rejected' ? 'bg-red-500/20 text-red-700' : 'bg-gray-500/20 text-gray-700'
+                          req.status === 'pending' ? 'bg-yellow-500/20 text-yellow-700 dark:bg-yellow-700/30 dark:text-yellow-300' :
+                          req.status === 'referred' ? 'bg-green-500/20 text-green-700 dark:bg-green-700/30 dark:text-green-300' :
+                          req.status === 'rejected' ? 'bg-red-500/20 text-red-700 dark:bg-red-700/30 dark:text-red-300' :
+                          'bg-gray-500/20 text-gray-700 dark:bg-gray-600/30 dark:text-gray-300'
                         }`}>
                           {req.status || 'N/A'}
                         </span>
@@ -257,7 +311,7 @@ const AdminDashboardPage = () => {
                   ))}
                 </TableBody>
               </Table>
-              {referralRequests.length === 0 && <p className="text-center py-4 text-muted-foreground">No referral requests found.</p>}
+              {filteredReferralRequests.length === 0 && <p className="text-center py-4 text-muted-foreground">No referral requests match your filters.</p>}
             </CardContent>
           </Card>
 
@@ -297,3 +351,5 @@ const AdminDashboardPage = () => {
 };
 
 export default AdminDashboardPage;
+
+    
