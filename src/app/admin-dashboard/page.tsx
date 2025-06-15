@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { BarChart, PieChart, Users, FileText, Eye, Hourglass, CheckCircle, XCircle, LogOut, FilterX } from 'lucide-react';
+import { BarChart, PieChart as PieChartIconLucide, Users, FileText, Eye, Hourglass, CheckCircle, XCircle, LogOut, FilterX } from 'lucide-react'; // Renamed PieChart import
 import { Skeleton } from '@/components/ui/skeleton';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from "@/components/ui/chart";
 import { Bar, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
@@ -42,7 +42,7 @@ interface Referrer {
 }
 
 type RequestStatus = 'pending' | 'referred' | 'rejected' | '';
-
+const ALL_STATUSES_SELECT_ITEM_VALUE = "_all_"; // Special value for SelectItem
 
 const AdminDashboardPage = () => {
   const router = useRouter();
@@ -52,7 +52,7 @@ const AdminDashboardPage = () => {
   const [isLoading, setIsLoading] = useState(true);
 
   const [filterTargetCompany, setFilterTargetCompany] = useState('');
-  const [filterStatus, setFilterStatus] = useState<RequestStatus>('');
+  const [filterStatus, setFilterStatus] = useState<RequestStatus>(''); // '' means all statuses
 
   useEffect(() => {
     const loggedIn = sessionStorage.getItem('isAdminLoggedIn');
@@ -80,7 +80,6 @@ const AdminDashboardPage = () => {
 
         } catch (error) {
           console.error("Error fetching admin data:", error);
-          // Handle error display if necessary
         } finally {
           setIsLoading(false);
         }
@@ -116,7 +115,7 @@ const AdminDashboardPage = () => {
   const filteredReferralRequests = useMemo(() => {
     return referralRequests.filter(req => {
       const companyMatch = filterTargetCompany ? req.targetCompany.toLowerCase().includes(filterTargetCompany.toLowerCase()) : true;
-      const statusMatch = filterStatus ? req.status === filterStatus : true;
+      const statusMatch = filterStatus ? req.status === filterStatus : true; // If filterStatus is '', it means all statuses
       return companyMatch && statusMatch;
     });
   }, [referralRequests, filterTargetCompany, filterStatus]);
@@ -128,7 +127,7 @@ const AdminDashboardPage = () => {
 
   const clearFilters = () => {
     setFilterTargetCompany('');
-    setFilterStatus('');
+    setFilterStatus(''); // Reset to show all
   };
 
   if (!isAdmin && isLoading) {
@@ -169,7 +168,6 @@ const AdminDashboardPage = () => {
         </div>
       ) : (
         <>
-          {/* Stats Cards */}
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -201,7 +199,7 @@ const AdminDashboardPage = () => {
              <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Requests by Status</CardTitle>
-                <PieChart className="h-4 w-4 text-muted-foreground" />
+                <PieChartIconLucide className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent className="flex justify-center items-center h-[100px]">
                 {requestsByStatus.length > 0 ? (
@@ -242,7 +240,6 @@ const AdminDashboardPage = () => {
             </Card>
           </div>
 
-          {/* Referral Requests Table */}
           <Card className="mb-8">
             <CardHeader>
               <CardTitle>All Referral Requests</CardTitle>
@@ -261,12 +258,17 @@ const AdminDashboardPage = () => {
                 </div>
                 <div className="flex-1 min-w-[150px]">
                   <Label htmlFor="filterStatus" className="text-sm">Filter by Status</Label>
-                  <Select value={filterStatus} onValueChange={(value) => setFilterStatus(value as RequestStatus)}>
+                  <Select
+                    value={filterStatus === '' ? ALL_STATUSES_SELECT_ITEM_VALUE : filterStatus}
+                    onValueChange={(value) => {
+                      setFilterStatus(value === ALL_STATUSES_SELECT_ITEM_VALUE ? '' : value as RequestStatus);
+                    }}
+                  >
                     <SelectTrigger className="mt-1">
-                      <SelectValue placeholder="Select status..." />
+                      <SelectValue placeholder="Filter by Status..." />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">All Statuses</SelectItem>
+                      <SelectItem value={ALL_STATUSES_SELECT_ITEM_VALUE}>All Statuses</SelectItem>
                       <SelectItem value="pending">Pending</SelectItem>
                       <SelectItem value="referred">Referred</SelectItem>
                       <SelectItem value="rejected">Rejected</SelectItem>
@@ -315,7 +317,6 @@ const AdminDashboardPage = () => {
             </CardContent>
           </Card>
 
-          {/* Referrers Table */}
           <Card>
             <CardHeader>
               <CardTitle>All Referrers</CardTitle>
@@ -351,5 +352,3 @@ const AdminDashboardPage = () => {
 };
 
 export default AdminDashboardPage;
-
-    
