@@ -73,6 +73,8 @@ const companySuggestions: ComboboxOption[] = [
   { value: "Mercedes", label: "Mercedes-Benz Group" },
   { value: "Salesforce", label: "Salesforce" },
   { value: "PwC", label: "PwC" },
+  { value: "Fresher", label: "Fresher" },
+  { value: "N/A", label: "N/A (Not Applicable)" },
 ];
 
 
@@ -627,7 +629,15 @@ const RequestReferralPage = () => {
                     <FormItem>
                       <FormLabel>Current Company (or 'Fresher'/'N/A')</FormLabel>
                       <FormControl>
-                        <Input placeholder="Your current company, or 'Fresher', 'N/A'" {...field} disabled={isLoading || isEmailVerified || paymentInProgress} />
+                        <Combobox
+                          options={companySuggestions}
+                          value={field.value}
+                          onChange={field.onChange}
+                          placeholder="Search or type current company, 'Fresher', or 'N/A'"
+                          searchPlaceholder="Type or Search company..."
+                          emptyResultText="No company found. You can type a custom name, 'Fresher', or 'N/A'."
+                          disabled={isLoading || isEmailVerified || paymentInProgress}
+                        />
                       </FormControl>    
                       <FormMessage />
                     </FormItem>
